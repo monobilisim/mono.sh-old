@@ -21,5 +21,3 @@ There are scripts that provide more than one convenience in this collection
 ## Tree of the Repository Content
 | Folder | Description |
 |--|--|
-| [Letsencrypt](https://github.com/monobilisim/mono.sh/tree/main/letsencrypt) | Scripts that simplify the use of LetsEncrypt |
-| [Zimbra](https://github.com/monobilisim/mono.sh/tree/main/zimbra) | Scripts for Zimbra management |
