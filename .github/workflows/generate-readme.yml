@@ -17,13 +17,13 @@ jobs:
         run: |
           cp $PWD/.github/templates/README.md $PWD/
           for a in $(find . -maxdepth 1 -type d -not -path '*/\.*' \( ! -iname ".*" \)); do
-             echo -e "[$(basename $a)](https://github.com/${{github.repository}}/tree/master/$(basename $a))" >> README.md
+             directory="$(basename $a)"
+             echo -e "[${directory^}](https://github.com/${{github.repository}}/tree/master/$(basename $a))\\" >> README.md
              pushd $a
              rm README.md
              echo -e "| Script | Description |\n|--|--|" > README.md
              for b in $(find . -type f -iname "*.sh"); do
                 filename="$(basename $b)"
-                directory="$(basename $a)"
                 fileurl="https://github.com/${{github.repository}}/main/tree/$directory/$filename"
                 filedescription="$(cat $b | grep '###~ description' | awk -F ': ' '{print $2}')"
                 echo -e "| [$filename]($fileurl) | $filedescription |" >> README.md
