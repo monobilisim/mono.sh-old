@@ -3,7 +3,7 @@ name: Generate new README.md
 on: 
   push:
     branches: 
-      - wip
+      - main
 
 jobs:
   generate: 
