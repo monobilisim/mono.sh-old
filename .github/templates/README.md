@@ -17,5 +17,3 @@ There are scripts that provide more than one convenience in this collection
 ---
 
 ## Tree of the Repository Content
-- [LetsEncrypt](https://github.com/monobilisim/mono.sh/tree/master/letsencrypt)
-- [Zimbra](https://github.com/monobilisim/mono.sh/tree/master/zimbra)
