@@ -24,7 +24,7 @@ jobs:
              echo -e "| Script | Description |\n|--|--|" > README.md
              for b in $(find . -type f -iname "*.sh"); do
                 filename="$(basename $b)"
-                fileurl="https://github.com/${{github.repository}}/main/tree/$directory/$filename"
+                fileurl="https://github.com/${{github.repository}}/blob/main/$directory/$filename"
                 filedescription="$(cat $b | grep '###~ description' | awk -F ': ' '{print $2}')"
                 echo -e "| [$filename]($fileurl) | $filedescription |" >> README.md
              done
