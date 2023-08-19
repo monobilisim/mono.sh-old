@@ -1,9 +1,9 @@
 <p align="center"><br>
-<a href="https://github.com/monobilisim/mt/graphs/contributors"><img alt="contributors" src="https://img.shields.io/github/contributors/monobilisim/mt.svg?style=for-the-badge"</img></a>
-<a href="https://github.com/monobilisim/mt/network/members"><img alt="forks" src="https://img.shields.io/github/forks/monobilisim/mt.svg?style=for-the-badge"</img></a>
-<a href="https://github.com/monobilisim/mt/stargazers"><img alt="starts" src="https://img.shields.io/github/stars/monobilisim/mt.svg?style=for-the-badge"</img></a>
-<a href="https://github.com/monobilisim/mt/issues"><img alt="issues" src="https://img.shields.io/github/issues/monobilisim/mt.svg?style=for-the-badge"</img></a>
-<a href="https://github.com/monobilisim/mt/blob/master/LICENSE"><img alt="licenses" src="https://img.shields.io/github/license/monobilisim/mt.svg?style=for-the-badge"</img></a><br><hr>
+<a href="https://github.com/monobilisim/mono.sh/graphs/contributors"><img alt="contributors" src="https://img.shields.io/github/contributors/monobilisim/mono.sh.svg?style=for-the-badge"</img></a>
+<a href="https://github.com/monobilisim/mono.sh/network/members"><img alt="forks" src="https://img.shields.io/github/forks/monobilisim/mono.sh.svg?style=for-the-badge"</img></a>
+<a href="https://github.com/monobilisim/mono.sh/stargazers"><img alt="starts" src="https://img.shields.io/github/stars/monobilisim/mono.sh.svg?style=for-the-badge"</img></a>
+<a href="https://github.com/monobilisim/mono.sh/issues"><img alt="issues" src="https://img.shields.io/github/issues/monobilisim/mono.sh.svg?style=for-the-badge"</img></a>
+<a href="https://github.com/monobilisim/mono.sh/blob/master/LICENSE"><img alt="licenses" src="https://img.shields.io/github/license/monobilisim/mono.sh.svg?style=for-the-badge"</img></a><br><hr>
 </p>
 
 <div align="center">
