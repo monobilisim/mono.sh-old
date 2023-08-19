@@ -19,5 +19,7 @@ There are scripts that provide more than one convenience in this collection
 ---
 
 ## Tree of the Repository Content
-[Letsencrypt](https://github.com/monobilisim/mono.sh/tree/master/letsencrypt)\
-[Zimbra](https://github.com/monobilisim/mono.sh/tree/master/zimbra)\
+| Folder | Description |
+|--|--|
+| [Letsencrypt](https://github.com/monobilisim/mono.sh/tree/main/letsencrypt) |  |
+| [Zimbra](https://github.com/monobilisim/mono.sh/tree/main/zimbra) |  |
