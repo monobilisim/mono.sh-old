@@ -7,7 +7,7 @@
 [[ ! -n $ZIMBRA_PATH ]] && { echo "Zimbra not found in /opt, aborting..."; exit 1; }
 
 #~ define variables
-templatefile="$ZIMBRA_PATH/conf/nginx/templates/nginx.conf.https.default.template"
+templatefile="$ZIMBRA_PATH/conf/nginx/templates/nginx.conf.web.https.default.template"
 certfile="$ZIMBRA_PATH/ssl/$PRODUCT_NAME/server/server.crt"
 keyfile="$ZIMBRA_PATH/ssl/$PRODUCT_NAME/server/server.key"
 message="Hello World!"
