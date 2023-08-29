@@ -15,7 +15,7 @@ message="Hello World!"
 #~ check template file and ip
 [[ ! -e $templatefile ]] && { echo "File \"$templatefile\" not found, aborting..."; exit 1; }
 [[ -e "$ZIMBRA_PATH/conf/nginx/external_ip.txt" ]] && ipaddress="$(cat $ZIMBRA_PATH/conf/nginx/external_ip.txt)" || ipaddress="$(curl -fsSL ifconfig.co)"
-[[ ! -n "$(echo $ipaddress | grep -Pzi '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+')" ]] && { echo "IP address error, aborting..."; exit 1; }
+[[ ! -n "$(echo $ipaddress | grep -Pzi '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | tr '\0' '\n')" ]] && { echo "IP address error, aborting..."; exit 1; }
 
 #~ define regex pattern and proxy block
 regexpattern="\\n?(server\\s+?{\\n?\\s+listen\\s+443\\sssl\\shttp2;\\n?\\s+server_name\\n?\\s+$ipaddress;\\n?\\s+ssl_certificate\\s+$certfile;\\n?\\s+ssl_certificate_key\\s+$keyfile;\\n?\\s+location\\s+\\/\\s+{\\n?\\s+return\\s200\\s\'$message\';\\n?\\s+}\\n?})"
