@@ -21,7 +21,7 @@ jobs:
              [[ ! -e $a/.dirinfo ]] && { DIRNAME="ERROR"; DIRINFO="$a/.dirinfo not defined..."; } || { DIRNAME="$(cat $a/.dirinfo | grep 'name:' | cut -d ' ' -f2- )"; DIRINFO="$(cat $a/.dirinfo | grep 'description:' | cut -d ' ' -f2-)"; }
              echo -e "| [${DIRNAME}](https://github.com/${{github.repository}}/tree/main/$(basename $a)) | ${DIRINFO} |" >> README.md
              pushd $a
-             rm README.md
+             [[ -e "README.md" ]] && rm README.md
              echo -e "| Script | Description |\n|--|--|" > README.md
              for b in $(find . -type f -iname "*.sh" | sort); do
                 filename="$(basename $b)"
