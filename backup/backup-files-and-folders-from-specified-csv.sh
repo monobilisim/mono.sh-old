@@ -3,7 +3,7 @@
 ###  csv file format: archive name, folder to backup
 
 #~ get variables
-destinationForBackups="$PWD/data"                             # yedek konumunu degistirirsin
+destinationForBackups="$/data"
 programLogDirectory="$(mktemp -d)"
 
 #~ define file if gives argument
