@@ -6,7 +6,7 @@ if [[ -e "/etc/sslrenew.conf" ]]; then
     . /etc/sslrenew.conf
 else
     echo "/etc/sslrenew.conf not found, pulling from git"
-    wget -q https://raw.githubusercontent.com/monobilisim/mono.sh/main/config/sslrenew.conf 
+    wget -q https://raw.githubusercontent.com/monobilisim/mono.sh/main/.config/sslrenew.conf 
 	echo "Please edit \"sslrenew.conf\" file and try again."
 	exit 0
 fi
