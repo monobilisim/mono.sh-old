@@ -26,7 +26,9 @@ chmod +x /usr/bin/caddy
 
 #~ update caddy and install modules
 caddy upgrade
+sleep 1
 caddy add-package github.com/caddy-dns/cloudflare
+sleep 1
 caddy add-package github.com/porech/caddy-maxmind-geolocation
 
 
