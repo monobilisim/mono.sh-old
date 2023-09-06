@@ -6,7 +6,7 @@
 
 
 #~ check required apps
-REQUIRED_APPS=('curl' 'wget' 'tar')
+REQUIRED_APPS=('curl' 'wget' 'tar' 'jq')
 for a in ${REQUIRED_APPS[@]}; do
 	[[ ! -e $(command -v $a) ]] && { echo "Please install \"$a\" before proceeding..."; exit 1; }
 done
