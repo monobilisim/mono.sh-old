@@ -7,7 +7,7 @@
 [[ ! -n $ZIMBRA_PATH ]] && { echo "Zimbra not found in /opt, aborting..."; exit 1; }
 
 #~ define variables
-templatefile="$ZIMBRA_PATH/conf/nginx/templates/nginx.conf.https.default.template"
+templatefile="$ZIMBRA_PATH/conf/nginx/templates/nginx.conf.web.https.default.template"
 [[ ! -e $templatefile ]] && { echo "File \"$templatefile\" not found, aborting..."; exit 1; }
 [[ ! -e "/etc/nginx-php-fpm.conf" ]] && { echo "Z-Push not found in this server, aborting..."; exit 1; }
 [[ -n $(grep "nginx-php-fpm.conf" $templatefile ]] && { echo "Z-Push config is already installed in \"$templatefile\""; exit 0; }
