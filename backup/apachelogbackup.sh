@@ -95,8 +95,6 @@ backupofalloldlogs() {
 main() {
 	checkvariable LOG_DIRECTORY SUBDOMAINS TARGETDIRECTORY
 	[[ "${#SUBDOMAINS[@]}" == "0" ]] && { echo "Subdomain list is empty..."; exit 1; }
-	checkcrontab
-	exit
 	for a in ${SUBDOMAINS[@]}; do
 		checkfolder $TARGETDIRECTORY/$a/access
 		checkfolder $TARGETDIRECTORY/$a/error
