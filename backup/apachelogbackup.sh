@@ -3,7 +3,7 @@
 
 #~ environments
 LOG_DIRECTORY="/usr/local/apache/logs"
-SUBDOMAINS=('a')                                            # syntax: ('example1.com' 'sub.example2.com')
+SUBDOMAINS=('example1' 'example2')                                    # syntax: ('example1.com' 'sub.example2.com')
 TARGETDIRECTORY="$LOG_DIRECTORY/archive"
 
 
