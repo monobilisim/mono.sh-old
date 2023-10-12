@@ -23,5 +23,6 @@ There are scripts that provide more than one convenience in this collection
 |--|--|
 | [Backup Scripts](https://github.com/monobilisim/mono.sh/tree/main/backup) | Simple backup scripts |
 | [LetsEncrypt](https://github.com/monobilisim/mono.sh/tree/main/letsencrypt) | Scripts that simplify the use of LetsEncrypt |
+| [Server Scripts](https://github.com/monobilisim/mono.sh/tree/main/server) | Script Collection for Server Management |
 | [Setup Scripts](https://github.com/monobilisim/mono.sh/tree/main/setupscripts) | Installation scripts for some programs |
 | [Zimbra](https://github.com/monobilisim/mono.sh/tree/main/zimbra) | Scripts for Zimbra management |
