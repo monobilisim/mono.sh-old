@@ -19,7 +19,7 @@ DATEOFTODAY=$(date +%y%m%d)
 #~ check crontab if not correctly configured
 checkcrontab() {
 	[[ "$(id -u)" != "0" ]] && { echo "Please run this script with administrative privileges.."; exit 1; }
-	CRONCONFIG="$(crontab -l | grep $0 | grep '^0 0')"
+	CRONCONFIG="$(crontab -l | grep $(realpath $0) | grep '^0 0')"
 	[[ ! -n $CRONCONFIG ]] && { echo -e "Cron is not correctly configured\nPlease add this line in crontab:\n\n0 0 * * * $(realpath $0) --yesterday"; exit 1; }
 }
 
