@@ -1,9 +1,8 @@
 #!/usr/bin/bash
 ###~ description: This script creates backups for easyengine sites and uploads them to a specified minio instance
 
-if [[ -f eeBackup.conf ]]; then
-    # . /etc/eeBackup.conf
-    . eeBackup.conf
+if [[ -f /etc/eeBackup.conf ]]; then
+    . /etc/eeBackup.conf
 else
     echo "Config file doesn't exists at /etc/eeBackup.conf"
     exit 1
