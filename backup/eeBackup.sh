@@ -9,7 +9,7 @@ else
 fi
 
 dateR=`date -R`
-dateI=`date -I`
+dateI=`date +%A`
 
 checkcrontab() {
 	[[ "$(id -u)" != "0" ]] && { echo "Please run this script with administrative privileges.."; exit 1; }
@@ -41,8 +41,24 @@ backup() {
 
     cp -r $versionfile $wpconfig $wpcontent .
 
-    tar -czf $1-${dateI}.tar.gz * 
+    tar -czf $1-${dateI}.tar.gz ./wp-config.php ./version.php ./wp-content 
 
+    upload $@
+
+    if [[ $(date -d "tomorrow" +%m) != $(date +%m) ]]
+    then
+        dateI=`date -I`
+        tar -czf $1-${dateI}.tar.gz ./wp-config.php ./version.php ./wp-content 
+        upload $@
+    fi
+
+    dateI=`date +%A`
+
+    cd $HOME
+    rm -rf $tempdir
+}
+
+upload() {
     resource="/${MINIO_BUCKET}/$1-${dateI}.tar.gz"
     content_type="application/octet-stream"
     _signature="PUT\n\n${content_type}\n${dateR}\n${resource}"
@@ -56,11 +72,8 @@ backup() {
               -H "Authorization: AWS ${MINIO_ACCESS_KEY_ID}:${signature}" \
               https://${MINIO_HOST}${resource}
             )
-    [[ -n "$(echo $curlout | grep -io error)" ]] && { echo Could not upload $1 to minio. Please check your credentials.; }
+    [[ -n "$(echo $curlout | grep -io error)" ]] && { echo Could not upload $1 to minio.; }
     echo =====================================
-
-    cd $HOME
-    rm -rf $tempdir
 }
 
 restore() {
