@@ -59,7 +59,7 @@ backup() {
 }
 
 upload() {
-    resource="/${MINIO_BUCKET}/$1-${dateI}.tar.gz"
+    resource="/${MINIO_BUCKET}/$HOSTNAME/$1/$1-${dateI}.tar.gz"
     content_type="application/octet-stream"
     _signature="PUT\n\n${content_type}\n${dateR}\n${resource}"
     signature=`echo -en ${_signature} | openssl sha1 -hmac ${MINIO_SECRET_ACCESS_KEY} -binary | base64`
@@ -126,6 +126,7 @@ main() {
 
     case $1 in 
         -b|--backup)
+            [[ "$2" == "all" ]] && { SITE_LIST=($(ls /opt/easyengine/sites)); } || { [[ -n "$2" ]] && { SITE_LIST=($(ls /opt/easyengine/sites | grep "^$2$")); }; }
             for a in ${SITE_LIST[@]}; do
                 backup $a
             done
