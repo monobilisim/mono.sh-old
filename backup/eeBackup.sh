@@ -127,6 +127,7 @@ main() {
     case $1 in 
         -b|--backup)
             [[ "$2" == "all" ]] && { SITE_LIST=($(ls /opt/easyengine/sites)); } || { [[ -n "$2" ]] && { SITE_LIST=($(ls /opt/easyengine/sites | grep "^$2$")); }; }
+	    checkvariable SITE_LIST
             for a in ${SITE_LIST[@]}; do
                 backup $a
             done
