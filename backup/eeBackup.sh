@@ -121,7 +121,7 @@ checkvariable() {
 }
 
 main() {
-    checkvariable MINIO_HOST MINIO_BUCKET MINIO_ACCESS_KEY_ID MINIO_SECRET_ACCESS_KEY SITE_LIST
+    checkvariable MINIO_HOST MINIO_BUCKET MINIO_ACCESS_KEY_ID MINIO_SECRET_ACCESS_KEY
     checkcrontab
 
     case $1 in 
