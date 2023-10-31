@@ -14,7 +14,7 @@ dateI=`date +%A`
 checkcrontab() {
 	[[ "$(id -u)" != "0" ]] && { echo "Please run this script with administrative privileges.."; exit 1; }
 	CRONCONFIG=$(crontab -l | grep $(realpath $0) | grep '^50 23')
-	[[ ! -n $CRONCONFIG ]] && { echo -e "Cron is not correctly configured\nPlease add this line in crontab:\n\n50 23 * * * $(realpath $0) -b"; exit 1; }
+	[[ ! -n $CRONCONFIG ]] && { echo -e "Cron is not correctly configured\nPlease add this line in crontab:\n\n50 23 * * * $(realpath $0) -b all"; exit 1; }
 }
 
 backup() {
