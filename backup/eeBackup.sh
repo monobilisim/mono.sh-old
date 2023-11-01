@@ -23,34 +23,58 @@ backup() {
     
     sitepath=/opt/easyengine/sites/$1
     [[ ! -d $sitepath ]] && { echo site $1 does not exists at /opt/easyengine/sites/; return; }
-    wpconfig=$sitepath/app/wp-config.php
-    versionfile=$sitepath/app/htdocs/wp-includes/version.php
-    wpcontent=$sitepath/app/htdocs/wp-content
-
-    if [[ -h $wpconfig ]]; then
-    	echo wp-config.php file not found at $wpconfig
-    	exit 1
+    if [[ -e $sitepath/app/htdocs/wp-config.php ]]; then
+        wpconfig=$sitepath/app/htdocs/wp-config.php
+        versionfile=$sitepath/app/htdocs/wp-includes/version.php
+        wpcontent=$sitepath/app/htdocs/wp-content
+        staticsite=0
+    elif [[ -e $sitepath/app/wp-config.php ]]; then
+        wpconfig=$sitepath/app/wp-config.php
+        versionfile=$sitepath/app/htdocs/wp-includes/version.php
+        wpcontent=$sitepath/app/htdocs/wp-content
+        staticsite=0
+    else
+        staticsite=1
     fi
-
-    DB_NAME=$(grep 'DB_NAME' $wpconfig | awk -F\' '{print $4}')
-    DB_USER=$(grep 'DB_USER' $wpconfig | awk -F\' '{print $4}')
-    DB_PASSWORD=$(grep 'DB_PASSWORD' $wpconfig | awk -F\' '{print $4}')
-    DB_HOST=$(docker inspect services_global-db_1 | jq -r '.[].NetworkSettings.Networks."ee-global-backend-network".IPAddress')
-
-    mysqldump $DB_NAME -h $DB_HOST -u $DB_USER -p$DB_PASSWORD > $1.sql
-
-    cp -r $versionfile $wpconfig $wpcontent .
-
-    tar -czf $1-${dateI}.tar.gz ./wp-config.php ./version.php ./wp-content 
-
-    upload $@
-
-    if [[ $(date -d "tomorrow" +%m) != $(date +%m) ]]
-    then
-        dateI=`date -I`
-        tar -czf $1-${dateI}.tar.gz ./wp-config.php ./version.php ./wp-content 
+    
+    if [[ "$staticsite" == "1" ]]; then
+        cp -r $sitepath/app/htdocs .
+        tar -czf $1-${dateI}.tar.gz htdocs
         upload $@
+        
+        if [[ $(date -d "tomorrow" +%m) != $(date +%m) ]]; then
+            dateI=`date -I`            
+            tar -czf $1-${dateI}.tar.gz htdocs
+            upload $@
+        fi
+    else 
+        if [[ ! -e $wpconfig ]]; then
+        	echo wp-config.php file not found at $wpconfig
+        	return
+        fi
+
+        DB_NAME=$(grep 'DB_NAME' $wpconfig | awk -F\' '{print $4}')
+        DB_USER=$(grep 'DB_USER' $wpconfig | awk -F\' '{print $4}')
+        DB_PASSWORD=$(grep 'DB_PASSWORD' $wpconfig | awk -F\' '{print $4}')
+        DB_HOST=$(docker inspect services_global-db_1 | jq -r '.[].NetworkSettings.Networks."ee-global-backend-network".IPAddress')
+
+        mysqldump $DB_NAME -h $DB_HOST -u $DB_USER -p$DB_PASSWORD > $1.sql
+
+        cp -r $versionfile $wpconfig $wpcontent .
+
+        tar -czf $1-${dateI}.tar.gz wp-config.php version.php wp-content $1.sql
+
+        upload $@
+
+
+        if [[ $(date -d "tomorrow" +%m) != $(date +%m) ]]; then
+            dateI=`date -I`
+            tar -czf $1-${dateI}.tar.gz wp-config.php version.php wp-content $1.sql
+            upload $@
+
+        fi
     fi
+    
 
     dateI=`date +%A`
 
@@ -126,8 +150,8 @@ main() {
 
     case $1 in 
         -b|--backup)
-            [[ "$2" == "all" ]] && { SITE_LIST=($(ls /opt/easyengine/sites)); } || { [[ -n "$2" ]] && { SITE_LIST=($(ls /opt/easyengine/sites | grep "^$2$")); }; }
-	    checkvariable SITE_LIST
+            [[ "$2" == "all" ]] && { SITE_LIST=($(ee site list | grep enabled | awk '{print $1}')); } || { [[ -n "$2" ]] && { SITE_LIST=($(ls /opt/easyengine/sites | grep "^$2$")); }; }
+	        checkvariable SITE_LIST
             for a in ${SITE_LIST[@]}; do
                 backup $a
             done
