@@ -13,8 +13,8 @@ dateI=`date +%A`
 
 checkcrontab() {
 	[[ "$(id -u)" != "0" ]] && { echo "Please run this script with administrative privileges.."; exit 1; }
-	CRONCONFIG=$(crontab -l | grep $(realpath $0) | grep '^30 23')
-	[[ ! -n $CRONCONFIG ]] && { echo -e "Cron is not correctly configured\nPlease add this line in crontab:\n\n30 23 * * * $(realpath $0) -b all"; exit 1; }
+	CRONCONFIG=$(crontab -l | grep $(realpath $0) | grep '^00 00')
+	[[ ! -n $CRONCONFIG ]] && { echo -e "Cron is not correctly configured\nPlease add this line in crontab:\n\n00 00 * * * $(realpath $0) -b all"; exit 1; }
 }
 
 backup() {
@@ -42,7 +42,7 @@ backup() {
         tar -czf $1-${dateI}.tar.gz htdocs
         upload $@
         
-        if [[ $(date -d "tomorrow" +%m) != $(date +%m) ]]; then
+        if [[ $(date -d "yesterday" +%m) != $(date +%m) ]]; then
             dateI=`date -I`            
             tar -czf $1-${dateI}.tar.gz htdocs
             upload $@
@@ -67,7 +67,7 @@ backup() {
         upload $@
 
 
-        if [[ $(date -d "tomorrow" +%m) != $(date +%m) ]]; then
+        if [[ $(date -d "yesterday" +%m) != $(date +%m) ]]; then
             dateI=`date -I`
             tar -czf $1-${dateI}.tar.gz wp-config.php version.php wp-content $1.sql
             upload $@
