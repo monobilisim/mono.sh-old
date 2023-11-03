@@ -1,6 +1,8 @@
 #!/usr/bin/bash
 ###~ description: This script creates backups for easyengine sites and uploads them to a specified minio instance
 
+# Needs xmllint(from libxml2-utils)
+
 if [[ -f /etc/eeBackup.conf ]]; then
     . /etc/eeBackup.conf
 else
@@ -8,8 +10,6 @@ else
     exit 1
 fi
 
-dateR=`date -R`
-dateI=`date +%A`
 
 checkcrontab() {
 	[[ "$(id -u)" != "0" ]] && { echo "Please run this script with administrative privileges.."; exit 1; }
@@ -18,6 +18,7 @@ checkcrontab() {
 }
 
 backup() {
+    dateI=`date +%A`
     tempdir=$(mktemp -d)
     cd $tempdir
     
@@ -40,12 +41,12 @@ backup() {
     if [[ "$staticsite" == "1" ]]; then
         cp -r $sitepath/app/htdocs .
         tar -czf $1-${dateI}.tar.gz htdocs
-        upload $@
+        upload $dateI $1
         
         if [[ $(date -d "yesterday" +%m) != $(date +%m) ]]; then
             dateI=`date -I`            
             tar -czf $1-${dateI}.tar.gz htdocs
-            upload $@
+            upload $dateI $1
         fi
     else 
         if [[ ! -e $wpconfig ]]; then
@@ -64,39 +65,37 @@ backup() {
 
         tar -czf $1-${dateI}.tar.gz wp-config.php version.php wp-content $1.sql
 
-        upload $@
+        upload $dateI $1
 
 
         if [[ $(date -d "yesterday" +%m) != $(date +%m) ]]; then
             dateI=`date -I`
             tar -czf $1-${dateI}.tar.gz wp-config.php version.php wp-content $1.sql
-            upload $@
+            upload $dateI $1
 
         fi
     fi
     
-
-    dateI=`date +%A`
-
     cd $HOME
     rm -rf $tempdir
 }
 
 upload() {
-    resource="/${MINIO_BUCKET}/$HOSTNAME/$1/$1-${dateI}.tar.gz"
+    dateR=`date -R`
+    resource="/${MINIO_BUCKET}/$HOSTNAME/${2}/${2}-${1}.tar.gz"
     content_type="application/octet-stream"
     _signature="PUT\n\n${content_type}\n${dateR}\n${resource}"
     signature=`echo -en ${_signature} | openssl sha1 -hmac ${MINIO_SECRET_ACCESS_KEY} -binary | base64`
 
-    echo $1
-    curlout=$(curl -X PUT -T "$1-${dateI}.tar.gz" \
+    echo ${2}
+    curlout=$(curl -X PUT -T "${2}-${1}.tar.gz" \
               -H "Host: ${MINIO_HOST}" \
               -H "Date: ${dateR}" \
               -H "Content-Type: ${content_type}" \
               -H "Authorization: AWS ${MINIO_ACCESS_KEY_ID}:${signature}" \
-              https://${MINIO_HOST}${resource}
+              https://${MINIO_HOST}${resource} | xmllint --xpath "//Error/Message" - 2>/dev/null
             )
-    [[ -n "$(echo $curlout | grep -io error)" ]] && { echo Could not upload $1 to minio.; }
+    [[ -n "$(echo $curlout | grep -io Message)" ]] && { curl -X POST -H "Content-Type: application/json" -d "{\"text\": \"Could not upload '${2}' to MinIO;\n\`\`\`\n$curlout\n\`\`\`\"}" "$ALARM_WEBHOOK_URL"; }
     echo =====================================
 }
 
