@@ -106,7 +106,7 @@ restore() {
 
     tar xzf $(basename $1)
 
-    [[ -e wp-config.php ]] && {echo "this is a static site please restore it manually"; return;}
+    [[ -e wp-config.php ]] && { echo "this is a static site please restore it manually"; return; }
 
     sitename=$(ls *.sql | sed 's/\.sql//g')
     sitepath=/opt/easyengine/sites/$sitename
