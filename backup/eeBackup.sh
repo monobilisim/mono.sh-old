@@ -39,7 +39,7 @@ backup() {
     fi
     
     if [[ "$staticsite" == "1" ]]; then
-        cp -r $sitepath/app/htdocs .
+        cp -a $sitepath/app/htdocs .
         tar -czf $1-${dateI}.tar.gz htdocs
         upload $dateI $1
         
@@ -61,7 +61,7 @@ backup() {
 
         mysqldump $DB_NAME -h $DB_HOST -u $DB_USER -p$DB_PASSWORD > $1.sql
 
-        cp -r $versionfile $wpconfig $wpcontent .
+        cp -a $versionfile $wpconfig $wpcontent .
 
         tar -czf $1-${dateI}.tar.gz wp-config.php version.php wp-content $1.sql
 
@@ -101,10 +101,13 @@ upload() {
 
 restore() {
     tempdir=$(mktemp -d)
-    cp $1 $tempdir
+    cp -a $1 $tempdir
     cd $tempdir
 
     tar xzf $(basename $1)
+
+    [[ -e wp-config.php ]] && {echo "this is a static site please restore it manually"; return;}
+
     sitename=$(ls *.sql | sed 's/\.sql//g')
     sitepath=/opt/easyengine/sites/$sitename
     [[ ! -d $sitepath ]] && { echo site $1 does not exists at /opt/easyengine/sites/; return; }
@@ -126,7 +129,7 @@ restore() {
     mv wp-content $wpcontent
     mv wp-config.php $wpconfig
 
-    cp *.sql $sitepath/app/htdocs
+    cp -a *.sql $sitepath/app/htdocs
     ee shell $sitename --command="wp db import ${sitename}.sql"
 
     ee site clean $sitename
