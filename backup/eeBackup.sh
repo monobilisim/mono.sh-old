@@ -126,7 +126,7 @@ restore() {
     mv wp-content $wpcontent
     mv wp-config.php $wpconfig
 
-    cp *.sql /opt/easyengine/sites/example.com/app/htdocs
+    cp *.sql $sitepath/app/htdocs
     ee shell $sitename --command="wp db import ${sitename}.sql"
 
     ee site clean $sitename
