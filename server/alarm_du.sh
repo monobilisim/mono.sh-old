@@ -1,4 +1,5 @@
 #!/bin/bash
+###~ description: When disk fullness reaches a certain limit, it sends a notification to the specified url.
 ####################################
 #
 ## DU (Disk Usage) Alarm for Zulip
