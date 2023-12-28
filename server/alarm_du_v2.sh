@@ -104,7 +104,8 @@ convertToProper() {
 
 report() {
 	local underthreshold=0
-	message="{\"text\": \"[ÇÖZÜLDÜ] - [ $(hostname) ${SERVER_NICK:+($SERVER_NICK)} ] Bölüm kullanım seviyesi aşağıdaki bölümler için $THRESHOLD% seviyesinin altına indi;\n\`\`\`\n"
+	[[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
+	message="{\"text\": \"[ÇÖZÜLDÜ] - [ $alarm_hostname ] Bölüm kullanım seviyesi aşağıdaki bölümler için $THRESHOLD% seviyesinin altına indi;\n\`\`\`\n"
 	table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
 	table+='\n'
 	for z in $(seq 1 110); do table+="$(printf '-')"; done
@@ -132,7 +133,8 @@ report() {
 
 
 	local overthreshold=0
-	message="{\"text\": \"[UYARI] - [ $(hostname) ] Bölüm kullanım seviyesi aşağıdaki bölümler için $THRESHOLD% seviyesinin üstüne çıktı;\n\`\`\`\n"
+	[[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
+	message="{\"text\": \"[UYARI] - [ $alarm_hostname ] Bölüm kullanım seviyesi aşağıdaki bölümler için $THRESHOLD% seviyesinin üstüne çıktı;\n\`\`\`\n"
 	table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')\n"
 	for z in $(seq 1 110); do table+="$(printf '-')"; done
 	local oldifs=$IFS
@@ -158,7 +160,7 @@ report() {
 			date +%Y-%m-%d > /tmp/alarm_du/${mountpoint//\//_}
 			overthreshold=1
 		fi
-        table+="\n$(printf '%-5s | %-10s | %-10s | %-35s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
+        table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
 	done
 	message+="$table\n\`\`\`\"}"
 	IFS=$oldifs
