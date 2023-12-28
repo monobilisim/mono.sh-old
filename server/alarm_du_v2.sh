@@ -163,7 +163,7 @@ report() {
 	message+="$table\n\`\`\`\"}"
 	IFS=$oldifs
 	#[[ "$overthreshold" == "1" ]] && echo $message || { echo "Overthreshold için bugün gönderilecek alarm yok..."; }
-    [[ "$overthreshold" == "1" ]] && curl -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "Underthreshold için bugün gönderilecek alarm yok..."; }
+    [[ "$overthreshold" == "1" ]] && curl -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "Overthreshold için bugün gönderilecek alarm yok..."; }
 }
 
 
