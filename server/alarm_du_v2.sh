@@ -2,7 +2,7 @@
 ###~ description: When disk fullness reaches a certain limit, it sends a notification to the specified url.
 
 #~ variables
-SCRIPT_VERSION="v2.1"
+SCRIPT_VERSION="v2.1.1"
 C_RED="\e[1;31m"
 C_GREEN="\e[1;32m"
 C_RESET="\e[0;39m"
@@ -105,7 +105,7 @@ convertToProper() {
 report() {
 	local underthreshold=0
 	[[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
-	message="{\"text\": \"[ÇÖZÜLDÜ] - [ $alarm_hostname ] Bölüm kullanım seviyesi aşağıdaki bölümler için $THRESHOLD% seviyesinin altına indi;\n\`\`\`\n"
+	message="{\"text\": \"[ÇÖZÜLDÜ] - [ $alarm_hostname ] Bölüm kullanım seviyesi aşağıdaki bölümler için %$THRESHOLD seviyesinin altına indi;\n\`\`\`\n"
 	table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
 	table+='\n'
 	for z in $(seq 1 110); do table+="$(printf '-')"; done
@@ -134,7 +134,7 @@ report() {
 
 	local overthreshold=0
 	[[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
-	message="{\"text\": \"[UYARI] - [ $alarm_hostname ] Bölüm kullanım seviyesi aşağıdaki bölümler için $THRESHOLD% seviyesinin üstüne çıktı;\n\`\`\`\n"
+	message="{\"text\": \"[UYARI] - [ $alarm_hostname ] Bölüm kullanım seviyesi aşağıdaki bölümler için %$THRESHOLD seviyesinin üstüne çıktı;\n\`\`\`\n"
 	table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')\n"
 	for z in $(seq 1 110); do table+="$(printf '-')"; done
 	local oldifs=$IFS
