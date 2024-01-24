@@ -59,11 +59,12 @@ for queue in ${queue_list[@]}; do
 done
 
 echo "---------------------------------------"
-echo " Last State"
+echo " Final State"
 echo "---------------------------------------"
 asterisk -rx "database get AMPUSER/$EXTEN cidname"
 mysql -e "SELECT data FROM asterisk.sip WHERE id = $EXTEN AND keyword = 'callerid';"
 mysql -e "SELECT name FROM asterisk.users WHERE extension = $EXTEN;"
 mysql -e "SELECT label, queuechannel FROM asterisk.fop2buttons WHERE exten = $EXTEN;"
+mysql -e "SELECT name, queue FROM qstats.monofon_agent WHERE extension = $EXTEN AND date = CURDATE();"
 echo "---------------------------------------"
 
