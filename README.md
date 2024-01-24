@@ -21,6 +21,7 @@ There are scripts that provide more than one convenience in this collection
 ## Tree of the Repository Content
 | Folder | Description |
 |--|--|
+| [Asterisk Scripts](https://github.com/monobilisim/mono.sh/tree/main/asterisk) | Scripts that simplify asterisk management |
 | [Backup Scripts](https://github.com/monobilisim/mono.sh/tree/main/backup) | Simple backup scripts |
 | [LetsEncrypt](https://github.com/monobilisim/mono.sh/tree/main/letsencrypt) | Scripts that simplify the use of LetsEncrypt |
 | [Server Scripts](https://github.com/monobilisim/mono.sh/tree/main/server) | Script Collection for Server Management |
