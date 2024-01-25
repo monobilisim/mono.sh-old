@@ -1,5 +1,5 @@
 #/bin/bash
-###~ description: Update a user in Asterisk
+###~ description: Rename a agent in Asterisk
 [[ ! -n "$1" ]] && { echo "User ID is not defined..."; exit 1; } || { EXTEN=$1; };
 [[ ! -n "$2" ]] && { echo "Username is not defined..."; exit 1; } || { NAME="$2"; };
 
@@ -41,21 +41,21 @@ mysql -e "UPDATE qstats.monofon_agent SET name = '$NAME' WHERE extension = $EXTE
 /etc/init.d/fop2 reload
 
 if [[ -n "$(whereis fwconsole)" ]]; then
-    fwconsole reload
+	fwconsole reload
 else
-    amportal a r
+	amportal a r
 fi
 
 queue_list=($(asterisk -rx "queue show" | grep strategy | awk '{print $1}'))
 for queue in ${queue_list[@]}; do
-    user_in_queue=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@")
-    if [[ ! -z "$user_in_queue" ]]; then
+	user_in_queue=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@" | grep -Po '(?<=\().+?(?=\))' | head -n 1)
+	if [[ ! -z "$user_in_queue" ]]; then
 		#echo "User $EXTEN is in queue $queue"
-		asterisk -rx "queue remove member Local/$EXTEN@from-queue/n from $queue"
-		asterisk -rx "queue add member Local/$EXTEN@from-queue/n to $queue"
-    else 
-        echo "User $EXTEN is not in queue $queue, skipping..."
-    fi
+		asterisk -rx "queue remove member \"$user_in_queue\" from $queue"
+		asterisk -rx "queue add member \"$user_in_queue\" to $queue penalty 0 as \"$NAME\""
+	else 
+		echo "User $EXTEN is not in queue $queue, skipping..."
+	fi
 done
 
 echo "---------------------------------------"
