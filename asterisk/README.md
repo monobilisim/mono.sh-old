@@ -1,3 +1,3 @@
 | Script | Description |
 |--|--|
-| [rename_member.sh](https://github.com/monobilisim/mono.sh/blob/main/asterisk/rename_member.sh) | Rename a agent in Asterisk |
+| [rename_agent.sh](https://github.com/monobilisim/mono.sh/blob/main/asterisk/rename_agent.sh) | Rename a agent in Asterisk |
