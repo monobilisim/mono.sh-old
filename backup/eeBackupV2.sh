@@ -41,7 +41,7 @@ backup() {
 				wpcontent=$sitepath/app/htdocs/wp-content
 			fi
 			
-			[[ ! -e $wpconfig ]] && { echo "wp-config.php not found at $wpconfig"; return 1; }
+			[[ ! -e $wpconfig ]] && { echo "wp-config.php not found at $sitepath"; return 1; }
 
 			ee shell "$a" --command="wp db export $a.sql"
 			cp -a "$versionfile" "$wpconfig" "$wpcontent" "$sitepath/app/htdocs/$a.sql" .
@@ -52,11 +52,11 @@ backup() {
 			echo "ee_sitedb=\$ee_sitename/\$ee_sitename.sql" >>siteinfo.txt
 			cd ..
 			tar -czf "$a-$(date +%A).tar.gz" "$a"
-			mc cp "./$a-$(date +%A).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
+			[[ "$NO_UPLOAD" == "1" ]] && cp "$a-$(date +%A).tar.gz" /root/ || mc cp "./$a-$(date +%A).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
 
 			if [[ $(date -d "yesterday" +%m) != $(date +%m) ]]; then
 				tar -czf "$a-$(date -I).tar.gz" "$a"
-				mc cp "./$a-$(date -I).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
+				[[ "$NO_UPLOAD" == "1" ]] && cp "$a-$(date -I).tar.gz" /root/ || mc cp "./$a-$(date -I).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
 			fi
 		elif [[ "$type" == "php" ]]; then
 			cp -a "$sitepath/app/htdocs" .
@@ -77,11 +77,11 @@ backup() {
 
 			cd ..
 			tar -czf "$a-$(date +%A).tar.gz" "$a"
-			mc cp "./$a-$(date +%A).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
+			[[ "$NO_UPLOAD" == "1" ]] && cp "$a-$(date +%A).tar.gz" /root/ || mc cp "./$a-$(date +%A).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
 
 			if [[ $(date -d "yesterday" +%m) != $(date +%m) ]]; then
 				tar -czf "$a-$(date -I).tar.gz" "$a"
-				mc cp "./$a-$(date -I).tar.gz" "$MINIO_PATH/$HOSTNAME/$a"
+				[[ "$NO_UPLOAD" == "1" ]] && cp "$a-$(date -I).tar.gz" /root/ || mc cp "./$a-$(date -I).tar.gz" "$MINIO_PATH/$HOSTNAME/$a"
 			fi
 		elif [[ "$type" == "html" ]]; then
 			cp -a "$sitepath/app/htdocs" .
@@ -90,11 +90,11 @@ backup() {
 			echo "ee_siteroot=\$ee_sitename/htdocs" >>siteinfo.txt
 			cd ..
 			tar -czf "$a-$(date +%A).tar.gz" "$a"
-			mc cp "./$a-$(date +%A).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
+			[[ "$NO_UPLOAD" == "1" ]] && cp "$a-$(date +%A).tar.gz" /root/ || mc cp "./$a-$(date +%A).tar.gz" "$MINIO_PATH/$HOSTNAME/$a/"
 
 			if [[ $(date -d "yesterday" +%m) != $(date +%m) ]]; then
 				tar -czf "$a-$(date -I).tar.gz" "$a"
-				mc cp "./$a-$(date -I).tar.gz" "$MINIO_PATH/$HOSTNAME/$a"
+				[[ "$NO_UPLOAD" == "1" ]] && cp "$a-$(date -I).tar.gz" /root/ || mc cp "./$a-$(date -I).tar.gz" "$MINIO_PATH/$HOSTNAME/$a"
 			fi
 		fi
 		cd ~ || exit
