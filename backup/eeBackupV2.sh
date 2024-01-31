@@ -198,14 +198,16 @@ sync_status() {
 
 restore() {
 	tmpdir=$(mktemp -d)
+	
+	[[ "$@" =~ "tar.gz" ]] && { backupname="$@"; } || { download; }
+	cp -r $backupname $tmpdir/
+
 	cd "$tmpdir" || exit
 
-	download
+	tar -xzf "$backupname" -C $tmpdir
 
-	tar -xzf "$backupname"
-
-	. "$sitename/siteinfo.txt"
-	[[ -z "$ee_sitename" ]] && { echo "Variable \"ee_sitename\" is not defined in $sitename/siteinfo.txt, aborting..."; return 1; }
+	. */siteinfo.txt
+	[[ -z "$ee_sitename" ]] && { echo "Variable \"ee_sitename\" is not defined in siteinfo.txt, aborting..."; return 1; }
 
 	[[ -d "/opt/easyengine/sites/$ee_sitename/backup" ]] && rm -rf "/opt/easyengine/sites/$ee_sitename/backup"
 	mkdir "/opt/easyengine/sites/$ee_sitename/backup"
@@ -216,6 +218,7 @@ restore() {
 		elif [[ -e /opt/easyengine/sites/$ee_sitename/app/wp-config.php ]]; then
 			wpconfig=("$ee_siteconfig" "/opt/easyengine/sites/$ee_sitename/app/wp-config.php")
 		fi
+
 		wpcontent=("$ee_siteroot" "/opt/easyengine/sites/$ee_sitename/app/htdocs/wp-content")
 
 		ee shell "$ee_sitename" --command="wp db export $ee_sitename.backup.sql"
@@ -265,7 +268,7 @@ usage() {
 }
 
 main() {
-	opt=($(getopt -l "backup:,config:,crontab,download,help,list:,restore,syncstat" -o "b:,c:,C,d,h,l:,r,s" -n "$0" -- "$@"))
+	opt=($(getopt -l "backup:,config:,crontab,download,help,list:,restore:,syncstat" -o "b:,c:,C,d,h,l:,r:,s" -n "$0" -- "$@"))
 	[[ "${#opt[@]}" == "1" ]] && { usage; exit 1; }
 	eval set -- "${opt[@]}"
 
@@ -290,7 +293,7 @@ main() {
 			list " " "$2" "[$2] List of sites for $HOSTNAME"
 			;;
 		-r | --restore)
-			restore
+			restore "$2"
 			break
 			;;
 		-s | --syncstat)
