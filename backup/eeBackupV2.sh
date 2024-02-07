@@ -43,7 +43,7 @@ backup() {
 			
 			[[ ! -e $wpconfig ]] && { echo "wp-config.php not found at $sitepath"; return 1; }
 
-			ee shell "$a" --command="wp db export $a.sql"
+			COMPOSE_INTERACTIVE_NO_CLI=1 ee shell "$a" --skip-tty --command="wp db export $a.sql"
 			cp -a "$versionfile" "$wpconfig" "$wpcontent" "$sitepath/app/htdocs/$a.sql" .
 			echo "ee_sitename=$a" >siteinfo.txt
 			echo "ee_sitetype=$(ee site info "$a" --format=json | jq -r '.site_type')" >>siteinfo.txt
@@ -221,14 +221,14 @@ restore() {
 
 		wpcontent=("$ee_siteroot" "/opt/easyengine/sites/$ee_sitename/app/htdocs/wp-content")
 
-		ee shell "$ee_sitename" --command="wp db export $ee_sitename.backup.sql"
+		COMPOSE_INTERACTIVE_NO_CLI=1 ee shell "$ee_sitename" --skip-tty --command="wp db export $ee_sitename.backup.sql"
 		mv "${wpconfig[1]}" "/opt/easyengine/sites/$ee_sitename/backup/"
 		mv "${wpcontent[1]}" "/opt/easyengine/sites/$ee_sitename/backup/"
 		mv "/opt/easyengine/sites/$ee_sitename/app/htdocs/$ee_sitename.backup.sql" "/opt/easyengine/sites/$ee_sitename/backup/"
 		cp -ar "${wpconfig[0]}" "${wpconfig[1]}"
 		cp -ar "${wpcontent[0]}" "${wpcontent[1]}"
 		cp -ar "$ee_sitedb" "/opt/easyengine/sites/$ee_sitename/app/htdocs"
-		ee shell "$ee_sitename" --command="wp db import $ee_sitename.sql"
+		COMPOSE_INTERACTIVE_NO_CLI=1 ee shell "$ee_sitename" --skip-tty --command="wp db import $ee_sitename.sql"
 	elif [[ "$ee_sitetype" == "html" ]]; then
 		mv "/opt/easyengine/sites/$ee_sitename/app/htdocs" "/opt/easyengine/sites/$ee_sitename/backup/"
 		cp -ar "$ee_siteroot" "/opt/easyengine/sites/$ee_sitename/app/"
