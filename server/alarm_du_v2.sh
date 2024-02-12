@@ -2,7 +2,7 @@
 ###~ description: When disk fullness reaches a certain limit, it sends a notification to the specified url.
 
 #~ variables
-SCRIPT_VERSION="v2.1.1"
+SCRIPT_VERSION="v2.1.2"
 C_RED="\e[1;31m"
 C_GREEN="\e[1;32m"
 C_RESET="\e[0;39m"
@@ -23,7 +23,7 @@ checkconfig() {
 
 
 check() {
-	local parts="$(df --output='source,fstype,target' | sed '1d' | sort | uniq | grep -E $(echo ${FILESYSTEMS[@]} | sed 's/ /|/g') | awk '$2 != "zfs" {print} $2 == "zfs" && $1 !~ /\//')"
+	local parts="$(df -l --output='source,fstype,target' | sed '1d' | sort | uniq | grep -E $(echo ${FILESYSTEMS[@]} | sed 's/ /|/g') | awk '$2 != "zfs" {print} $2 == "zfs" && $1 !~ /\//')"
 	local oldifs=$IFS
 	local json="["
 	IFS=$'\n'
@@ -32,7 +32,7 @@ check() {
 		partition=${info[0]}
 		filesystem=${info[1]}
 		mountpoint=${info[2]}
-		if [[ -n "$(echo $filesystem | grep -E 'ext4|ext3|ext2|xfs|nfs4')" ]]; then
+		if [[ -n "$(echo $filesystem | grep -E 'ext4|ext3|ext2|xfs')" ]]; then
 			IFS=$oldifs stat=($(df -B1 --output="used,size,pcent" $mountpoint | sed '1d'))
 			usage=${stat[0]}
 			total=${stat[1]}
