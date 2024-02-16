@@ -21,9 +21,9 @@ There are scripts that provide more than one convenience in this collection
 ## Tree of the Repository Content
 | Folder | Description |
 |--|--|
-| [Asterisk Scripts](https://github.com/monobilisim/mono.sh/tree/main/asterisk) | Scripts that simplify asterisk management |
 | [Backup Scripts](https://github.com/monobilisim/mono.sh/tree/main/backup) | Simple backup scripts |
+| [Setup Scripts](https://github.com/monobilisim/mono.sh/tree/main/install) | Installation scripts for some programs |
 | [LetsEncrypt](https://github.com/monobilisim/mono.sh/tree/main/letsencrypt) | Scripts that simplify the use of LetsEncrypt |
-| [Server Scripts](https://github.com/monobilisim/mono.sh/tree/main/server) | Script Collection for Server Management |
-| [Setup Scripts](https://github.com/monobilisim/mono.sh/tree/main/setupscripts) | Installation scripts for some programs |
-| [Zimbra](https://github.com/monobilisim/mono.sh/tree/main/zimbra) | Scripts for Zimbra management |
+| [Server Scripts](https://github.com/monobilisim/mono.sh/tree/main/monocloud) | Script Collection for Server Management |
+| [Asterisk Scripts](https://github.com/monobilisim/mono.sh/tree/main/monofon) | Scripts that simplify asterisk management |
+| [Zimbra](https://github.com/monobilisim/mono.sh/tree/main/monomail) | Scripts for Zimbra management |
