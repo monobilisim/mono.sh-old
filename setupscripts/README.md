@@ -1,3 +1,3 @@
 | Script | Description |
 |--|--|
-| [caddyinstaller.sh](https://github.com/monobilisim/mono.sh/blob/main/setupscripts/caddyinstaller.sh) | setup script for caddy server |
+| [caddy-installer.sh](https://github.com/monobilisim/mono.sh/blob/main/setupscripts/caddy-installer.sh) | setup script for caddy server |
