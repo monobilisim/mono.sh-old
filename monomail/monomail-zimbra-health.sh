@@ -56,7 +56,7 @@ function alarm_check_down() {
         current_date=$(date "+%Y-%m-%d")
         if [ "${old_date}" != "${current_date}" ]; then
             date "+%Y-%m-%d %H:%M" >"${file_path}"
-            alarm "$2"
+            alarm "[Zimbra - $IDENTIFIER] [:red_circle:] $2"
         fi
     else
         date "+%Y-%m-%d %H:%M" >"${file_path}"
