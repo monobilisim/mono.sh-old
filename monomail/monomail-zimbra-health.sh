@@ -159,7 +159,7 @@ server {
         echo "Added proxy control block in $templatefile file..."
     fi
     ip=$(wget -qO- ifconfig.me/ip)
-    if ! curl -s --insecure --connect-timeout 30 https://"$ip" | grep -iq zimbra; then
+    if ! curl -s --insecure --connect-timeout 15 https://"$ip" | grep -iq zimbra; then
         alarm_check_up "ip_access" "Can't access to zimbra through plain ip: $ip at $IDENTIFIER"
         print_colour "Access with ip" "not accessible"
     else
@@ -243,6 +243,18 @@ function check_z-push() {
     fi
 }
 
+function queued_messages() {
+    echo_status "Queued Messages"
+    queue=$(/opt/zimbra/common/sbin/mailq | grep -c "^[A-F0-9]")
+    if [ "$queue" -lt $QUEUE_LIMIT ]; then
+        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT"
+        print_colour "Number of queued messages" "$queue"
+    else
+        alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT"
+        print_colour "Number of queued messages" "$queue" "error"
+    fi
+}
+
 function main() {
     printf '\n'
     echo "Monomail Zimbra Health $VERSION - $(date)"
@@ -252,6 +264,8 @@ function main() {
     check_zimbra_services
     printf '\n'
     check_z-push
+    printf '\n'
+    queued_messages
 }
 
 pidfile=/var/run/monomail-zimbra-health.sh.pid
