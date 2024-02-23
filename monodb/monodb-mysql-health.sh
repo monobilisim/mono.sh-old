@@ -128,13 +128,13 @@ function check_cluster_synced() {
     name=$(echo "$output" | awk '{print $1}')
     is_synced=$(echo "$output" | awk '{print $2}')
     if [ -n "$is_synced" ]; then
-        alarm_check_up "is_synced" "Cluster sync status $name is $is_synced at $IDENTIFIER"
+        alarm_check_up "is_synced" "Node sync status $name is $is_synced at $IDENTIFIER"
         print_colour "$name" "$is_synced"
     elif [ -z "$name" ] || [ -z "$is_synced" ]; then
-        alarm_check_down "is_synced" "Cluster sync status couldn't get a response from MySQL $IDENTIFIER"
-        print_colour "Cluster sync status" "Couldn't get info" "error"
+        alarm_check_down "is_synced" "Node sync status couldn't get a response from MySQL $IDENTIFIER"
+        print_colour "Node sync status" "Couldn't get info" "error"
     else
-        alarm_check_down "is_synced" "Cluster sync status $name is $is_synced $IDENTIFIER"
+        alarm_check_down "is_synced" "Node sync status $name is $is_synced $IDENTIFIER"
         print_colour "$name" "$is_synced" "error"
     fi
 }
@@ -169,4 +169,3 @@ echo $$ >${pidfile}
 main
 
 rm ${pidfile}
-

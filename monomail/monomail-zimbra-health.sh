@@ -1,7 +1,4 @@
-#!/usr/bin/env bash
-###~ description: Checks the status of Zimbra and related services
-
-VERSION=v0.1.0
+VERSION=v0.8.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -160,10 +157,10 @@ server {
     fi
     ip=$(wget -qO- ifconfig.me/ip)
     if ! curl -s --insecure --connect-timeout 15 https://"$ip" | grep -iq zimbra; then
-        alarm_check_up "ip_access" "Can't access to zimbra through plain ip: $ip at $IDENTIFIER"
+        alarm_check_up "ip_access" "Can't access to zimbra through plain ip: $ip"
         print_colour "Access with ip" "not accessible"
     else
-        alarm_check_down "ip_access" "Can access to zimbra through plain ip: $ip at $IDENTIFIER"
+        alarm_check_down "ip_access" "Can access to zimbra through plain ip: $ip"
         print_colour "Access with ip" "accessible" "error"
     fi
 }
@@ -172,7 +169,11 @@ function check_zimbra_services() {
     echo_status "Zimbra services"
     OLDIFS=$IFS
     IFS=$'\n'
-    zimbra_services="$(su - zimbra -c "zmcontrol status" 2>/dev/null | sed '1d')"
+    if id "zimbra" &>/dev/null; then
+        zimbra_services="$(su - zimbra -c "zmcontrol status" 2>/dev/null | sed '1d')"
+    else
+        zimbra_services="$(su - zextras -c "zmcontrol status" 2>/dev/null | sed '1d')"
+    fi
     # should_restart=0
     i=0
     for service in $zimbra_services; do
@@ -182,11 +183,11 @@ function check_zimbra_services() {
         if [[ $is_active =~ [A-Z] ]]; then
             if [ "${is_active,,}" != 'running' ]; then
                 [ $RESTART_COUNTER -gt $RESTART_LIMIT ] && {
-                    alarm_check_down "$service_name" "[ Zimbra - Error ] Couldn't restart stopped services in $((RESTART_LIMIT + 1)) tries at $IDENTIFIER"
+                    alarm_check_down "$service_name" "Couldn't restart stopped services in $((RESTART_LIMIT + 1)) tries"
                     echo "${RED_FG}Couldn't restart stopped services in $((RESTART_LIMIT + 1)) tries${RESET}"
                     return
                 }
-                alarm_check_down "$service_name" "[ Zimbra - Error ] Service: $service_name is not running at $IDENTIFIER"
+                alarm_check_down "$service_name" "Service: $service_name is not running"
                 print_colour "$service_name" "$is_active" "error"
                 if [ $RESTART == 1 ]; then
                     # i=$(echo "${ZIMBRA_SERVICES[@]}" | sed 's/ /\n/g' | grep "$service_name:")
@@ -224,7 +225,7 @@ function check_zimbra_services() {
                 fi
                 # should_restart=1
             else
-                alarm_check_up "$service_name" "[ Zimbra - Solved ] Service: $service_name started running at $IDENTIFIER"
+                alarm_check_up "$service_name" "Service: $service_name started running"
                 print_colour "$service_name" "$is_active"
             fi
         fi
@@ -234,18 +235,22 @@ function check_zimbra_services() {
 
 function check_z-push() {
     echo_status "Checking Z-Push:"
-    if curl -Is "$Z_URL" | grep -i zpush >/dev/null; then
-        alarm_check_up "z-push" "[ Zimbra - Solved ] Z-Push started working again at $IDENTIFIER"
+    if curl -Isk "$Z_URL" | grep -i zpush >/dev/null; then
+        alarm_check_up "z-push" "Z-Push started working"
         print_colour "Z-Push" "Working"
     else
-        alarm_check_down "z-push" "[ Zimbra - Error ] Z-Push is not working at $IDENTIFIER"
+        alarm_check_down "z-push" "Z-Push is not working"
         print_colour "Z-Push" "Not Working" "error"
     fi
 }
 
 function queued_messages() {
     echo_status "Queued Messages"
-    queue=$(/opt/zimbra/common/sbin/mailq | grep -c "^[A-F0-9]")
+    if [ -d /opt/zimbra ]; then
+        queue=$(/opt/zimbra/common/sbin/mailq | grep -c "^[A-F0-9]")
+    else
+        queue=$(/opt/zextras/common/sbin/mailq | grep -c "^[A-F0-9]")
+    fi
     if [ "$queue" -lt $QUEUE_LIMIT ]; then
         alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT"
         print_colour "Number of queued messages" "$queue"
