@@ -1,3 +1,6 @@
+#!/bin/bash
+###~ description: This script checks zimbra and zextras health
+
 VERSION=v0.8.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
