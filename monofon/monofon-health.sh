@@ -357,7 +357,7 @@ function alarm_check_down() {
     service_name=${1//\//-}
     file_path="/tmp/monofon-health/monofon_${service_name}_status.txt"
 
-    if [ -z $4 ]; then
+    if [ -z $3 ]; then
         if [ -f "${file_path}" ]; then
             old_date=$(awk '{print $1}' <"$file_path")
             current_date=$(date "+%Y-%m-%d")
@@ -404,7 +404,7 @@ function alarm_check_up() {
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
 
-        if [ -z $4 ]; then
+        if [ -z $3 ]; then
             rm -rf "${file_path}"
             alarm "[Monofon - $IDENTIFIER] [:check:] $2"
         else
