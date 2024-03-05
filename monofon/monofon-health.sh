@@ -1,5 +1,6 @@
 #!/bin/bash
 ###~ description: Checks the status of monofon and related services
+
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 mkdir -p /tmp/monofon-health
 
@@ -422,7 +423,7 @@ function check_db() {
     tables=$(echo "$check_out" | sed -n '/Repairing tables/,$p' | tail -n +2)
     message=""
     if [ -n "$tables" ]; then
-        message="MySQL - \`mysqlcheck --auto-repair --all-databases\` result"
+        message="[Monofon - $IDENTIFIER] [:info:] MySQL - \`mysqlcheck --auto-repair --all-databases\` result"
     fi
     oldIFS=$IFS
     IFS=$'\n'
@@ -550,3 +551,4 @@ echo $$ >${pidfile}
 main
 
 rm ${pidfile}
+
