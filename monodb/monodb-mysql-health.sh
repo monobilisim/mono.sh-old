@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of MySQL and MySQL cluster
-VERSION=v0.1.0
+VERSION=v0.6.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -82,10 +82,10 @@ function check_process_count() {
     processlist_count=$(/usr/bin/mysqladmin processlist | grep -vc 'show processlist')
 
     if [[ "$processlist_count" -lt "$PROCESS_LIMIT" ]]; then
-        alarm_check_up "no_processes" "Number of processes is below limit: $processlist_count/$PROCESS_LIMIT at $IDENTIFIER"
+        alarm_check_up "no_processes" "Number of processes is below limit: $processlist_count/$PROCESS_LIMIT"
         print_colour "Number of Processes" "$processlist_count/$PROCESS_LIMIT"
     else
-        alarm_check_down "no_processes" "Number of processes is above limit: $processlist_count/$PROCESS_LIMIT at $IDENTIFIER"
+        alarm_check_down "no_processes" "Number of processes is above limit: $processlist_count/$PROCESS_LIMIT"
         print_colour "Number of Processes" "$processlist_count/$PROCESS_LIMIT" "error"
     fi
 
@@ -96,13 +96,13 @@ function check_cluster_status() {
     cluster_status=$(mysql -sNe "SHOW STATUS WHERE Variable_name = 'wsrep_cluster_size';")
     no_cluster=$(echo "$cluster_status" | awk '{print $2}')
     if [ "$no_cluster" -eq "$CLUSTER_SIZE" ]; then
-        alarm_check_up "cluster_size" "Cluster size is accurate: $no_cluster/$CLUSTER_SIZE at $IDENTIFIER"
+        alarm_check_up "cluster_size" "Cluster size is accurate: $no_cluster/$CLUSTER_SIZE"
         print_colour "Cluster size" "$no_cluster/$CLUSTER_SIZE"
     elif [ -z "$no_cluster" ]; then
-        alarm_check_down "cluster_size" "Couldn't get cluster size: $no_cluster/$CLUSTER_SIZE at $IDENTIFIER"
+        alarm_check_down "cluster_size" "Couldn't get cluster size: $no_cluster/$CLUSTER_SIZE"
         print_colour "Cluster size" "Couln't get" "error"
     else
-        alarm_check_down "cluster_size" "Cluster size is not accurate: $no_cluster/$CLUSTER_SIZE at $IDENTIFIER"
+        alarm_check_down "cluster_size" "Cluster size is not accurate: $no_cluster/$CLUSTER_SIZE"
         print_colour "Cluster size" "$no_cluster/$CLUSTER_SIZE" "error"
     fi
 }
@@ -112,14 +112,14 @@ function check_node_status() {
     name=$(echo "$output" | awk '{print $1}')
     is_available=$(echo "$output" | awk '{print $2}')
     if [ -n "$is_available" ]; then
-        alarm_check_up "is_available" "Node status $name is $is_available at $IDENTIFIER"
-        print_colour "$name" "$is_available"
+        alarm_check_up "is_available" "Node status $name is $is_available"
+        print_colour "Node status" "$is_available"
     elif [ -z "$name" ] || [ -z "$is_available" ]; then
-        alarm_check_down "is_available" "Node status couldn't get a response from MySQL at $IDENTIFIER"
+        alarm_check_down "is_available" "Node status couldn't get a response from MySQL"
         print_colour "Node status" "Couldn't get info" "error"
     else
-        alarm_check_down "is_available" "Node status $name is $is_available at $IDENTIFIER"
-        print_colour "$name" "$is_available" "error"
+        alarm_check_down "is_available" "Node status $name is $is_available"
+        print_colour "Node status" "$is_available" "error"
     fi
 }
 
@@ -128,14 +128,27 @@ function check_cluster_synced() {
     name=$(echo "$output" | awk '{print $1}')
     is_synced=$(echo "$output" | awk '{print $2}')
     if [ -n "$is_synced" ]; then
-        alarm_check_up "is_synced" "Node sync status $name is $is_synced at $IDENTIFIER"
-        print_colour "$name" "$is_synced"
+        alarm_check_up "is_synced" "Node local state $name is $is_synced"
+        print_colour "Node local state" "$is_synced"
     elif [ -z "$name" ] || [ -z "$is_synced" ]; then
-        alarm_check_down "is_synced" "Node sync status couldn't get a response from MySQL $IDENTIFIER"
-        print_colour "Node sync status" "Couldn't get info" "error"
+        alarm_check_down "is_synced" "Node local state couldn't get a response from MySQL"
+        print_colour "Node local state" "Couldn't get info" "error"
     else
-        alarm_check_down "is_synced" "Node sync status $name is $is_synced $IDENTIFIER"
-        print_colour "$name" "$is_synced" "error"
+        alarm_check_down "is_synced" "Node local state $name is $is_synced"
+        print_colour "Node local state" "$is_synced" "error"
+    fi
+}
+
+function check_flow_control() {
+    output=$(mysql -sNe "SHOW STATUS WHERE Variable_name = 'wsrep_flow_control_paused';")
+    name=$(echo "$output" | awk '{print $1}')
+    stop_time=$(echo "$output" | awk '{print $2}' | cut -c 1)
+    if [ "$stop_time" -gt 0 ]; then
+        alarm_check_down "is_synced" "Replication paused by Flow Control more than 1 second - $stop_time"
+        print_colour "Replication pause time" "$stop_time" "error"
+    else
+        alarm_check_up "is_synced" "Replication paused by Flow Control less than 1 second again - $stop_time"
+        print_colour "Replication pause time" "$stop_time"
     fi
 }
 
@@ -149,6 +162,7 @@ function main() {
         check_cluster_status
         check_node_status
         check_cluster_synced
+        check_flow_control
     fi
 }
 
