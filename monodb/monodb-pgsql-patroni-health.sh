@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of PostgreSQL and Patroni cluster
-
-VERSION=v0.1.0
+VERSION=v0.2.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -47,7 +46,7 @@ function alarm_check_down() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monodb-pgsql-patroni-health/postal_${service_name}_status.txt"
+    file_path="/tmp/monodb-pgsql-patroni-health/patroni_${service_name}_status.txt"
 
     if [ -f "${file_path}" ]; then
         old_date=$(awk '{print $1}' <"$file_path")
@@ -69,7 +68,7 @@ function alarm_check_up() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monodb-pgsql-patroni-health/postal_${service_name}_status.txt"
+    file_path="/tmp/monodb-pgsql-patroni-health/patroni_${service_name}_status.txt"
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
@@ -97,26 +96,28 @@ function cluster_role() {
         return
     fi
     alarm_check_up "patroni_api" "Patroni API is accessible again through: $PATRONI_API"
-    mapfile -t cluster_names < <(curl -s "$PATRONI_API" | jq -r '.members[] | .name ')
-    mapfile -t cluster_roles < <(curl -s "$PATRONI_API" | jq -r '.members[] | .role')
+    output=$(curl -s "$PATRONI_API")
+    mapfile -t cluster_names < <(echo "$output" | jq -r '.members[] | .name ')
+    mapfile -t cluster_roles < <(echo "$output" | jq -r '.members[] | .role')
     i=0
     for cluster in "${cluster_names[@]}"; do
         print_colour "$cluster" "${cluster_roles[$i]}"
         if
-            [ -f /tmp/monodb-pgsql-patroni-health/raw_output.json ] &&
-                old_role="$(jq -r '.members['"$i"'] | .role' </tmp/monodb-pgsql-patroni-health/raw_output.json)"
-            [ "${cluster_roles[$i]}" != "$old_role" ] &&
-                [ "$cluster" == "$(jq -r '.members['"$i"'] | .name' </tmp/monodb-pgsql-patroni-health/raw_output.json)" ]
+            [ -f /tmp/monodb-pgsql-patroni-health/raw_output.json ]
         then
-            echo "  Role of $cluster has changed!"
-            print_colour "  Old Role of $cluster" "$old_role" "error"
-            printf '\n'
-            alarm "[Patroni - $IDENTIFIER] [:info:] Role of $cluster has changed! Old: **$old_role**, Now: **${cluster_roles[$i]}**"
-            [ "${cluster_roles[$i]}" == "leader" ] && alarm "[Patroni - $IDENTIFIER] [:check:] New leader is $cluster!"
+            old_role="$(jq -r '.members['"$i"'] | .role' </tmp/monodb-pgsql-patroni-health/raw_output.json)"
+            if [ "${cluster_roles[$i]}" != "$old_role" ] &&
+                [ "$cluster" == "$(jq -r '.members['"$i"'] | .name' </tmp/monodb-pgsql-patroni-health/raw_output.json)" ]; then
+                echo "  Role of $cluster has changed!"
+                print_colour "  Old Role of $cluster" "$old_role" "error"
+                printf '\n'
+                alarm "[Patroni - $IDENTIFIER] [:info:] Role of $cluster has changed! Old: **$old_role**, Now: **${cluster_roles[$i]}**"
+                [ "${cluster_roles[$i]}" == "leader" ] && alarm "[Patroni - $IDENTIFIER] [:check:] New leader is $cluster!"
+            fi
         fi
         i=$((i + 1))
     done
-    curl -s "$PATRONI_API" | jq >/tmp/monodb-pgsql-patroni-health/raw_output.json
+    echo "$output" | jq >/tmp/monodb-pgsql-patroni-health/raw_output.json
 }
 
 function cluster_state() {
