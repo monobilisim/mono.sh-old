@@ -524,7 +524,9 @@ function main() {
     fi
     asterisk_error_check
     if [ $(date "+%H:%M") == "12:00" ] && echo "$IDENTIFIER" | grep sip >/dev/null; then
-        check_voice_records
+        if ! containsElement "recordings" "${IGNORED_SERVICES[@]}"; then
+            check_voice_records
+        fi
     fi
     # rewrite_monofon_data
 }
