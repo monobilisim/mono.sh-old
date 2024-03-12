@@ -471,7 +471,7 @@ check_voice_records() {
 
 function rewrite_monofon_data() {
     if ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
-        file="/tmp/monofon-health/rowcount.txt"
+        file="/tmp/monofon-health/rewrite-monofon-data-row-count.txt"
         if [[ -f /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php ]] && ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
             if [[ $(date "+%H:%M") == "01:00" ]]; then
                 if screen -dm php /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php $(date -d "yesterday" '+%Y-%m-%d'); then
