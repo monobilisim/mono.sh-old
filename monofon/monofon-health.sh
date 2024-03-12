@@ -375,7 +375,7 @@ function alarm_check_down() {
             [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
             current_date=$(date "+%Y-%m-%d")
             if [ "${old_date}" != "${current_date}" ]; then
-                date "+%Y-%m-%d %H:%M" >"${file_path}"
+                date "+%Y-%m-%d %H:%M locked" >"${file_path}"
                 alarm "[Monofon - $IDENTIFIER] [:red_circle:] $2"
             else
                 if ! $locked; then
