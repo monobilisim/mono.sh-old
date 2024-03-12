@@ -370,7 +370,6 @@ function alarm_check_down() {
             alarm "[Monofon - $IDENTIFIER] [:red_circle:] $2"
         fi
     else
-        echo vololo
         if [ -f "${file_path}" ]; then
             old_date=$(awk '{print $1}' <"$file_path")
             [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
