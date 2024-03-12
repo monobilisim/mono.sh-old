@@ -548,7 +548,7 @@ function main() {
         fi
     fi
     check_data_file
-    # rewrite_monofon_data
+    rewrite_monofon_data
 }
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
