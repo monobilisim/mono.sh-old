@@ -370,6 +370,7 @@ function alarm_check_down() {
             alarm "[Monofon - $IDENTIFIER] [:red_circle:] $2"
         fi
     else
+        echo vololo
         if [ -f "${file_path}" ]; then
             old_date=$(awk '{print $1}' <"$file_path")
             [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
@@ -488,6 +489,25 @@ function rewrite_monofon_data() {
     fi
 }
 
+function check_data_file() {
+    echo_status "Checking data.json"
+    data_timestamp="/tmp/monofon-health/monofon_data-json.txt"
+    data_file="/var/www/html/monofon-pano-yeni/data/data.json"
+    if [ -f $data_timestamp ]; then
+        before=$(cat $data_timestamp)
+        now=$(stat -c %y $data_file)
+        if [ "$before" == "$now" ]; then
+            alarm_check_down "data-json" "No changes made to file: $data_file"
+            print_colour "data.json" "not updated"
+            else 
+            alarm_check_up "data-json" "Data file updated. File: $data_file"
+            print_colour "data.json" "updated"
+        fi
+    echo "$now" > $data_timestamp
+    fi
+    stat -c %y $data_file > $data_timestamp
+}
+
 function main() {
     is_old=0
     # Checks if systemctl is present, if not it uses service instead
@@ -528,6 +548,7 @@ function main() {
             check_voice_records
         fi
     fi
+    check_data_file
     # rewrite_monofon_data
 }
 
@@ -553,4 +574,3 @@ echo $$ >${pidfile}
 main
 
 rm ${pidfile}
-
