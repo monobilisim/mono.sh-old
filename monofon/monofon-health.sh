@@ -13,7 +13,7 @@ else
     exit 1
 fi
 if [ -z "$TRUNK_CHECK_INTERVAL" ]; then
-    TRUNK_CHECK_INTERVAL=3
+    TRUNK_CHECK_INTERVAL=5
 fi
 
 RED_FG=$(tput setaf 1)
