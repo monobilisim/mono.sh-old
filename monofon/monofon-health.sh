@@ -563,8 +563,10 @@ if [ -f ${pidfile} ]; then
     oldpid=$(cat ${pidfile})
 
     if ! ps -p "${oldpid}" &>/dev/null; then
+        alarm_check_up "still_running" "Old process no longer runs."
         rm ${pidfile} # pid file is stale, remove it
     else
+        alarm_check_down "still_running" "Old process is still running."
         echo "Old process still running"
         exit 1
     fi
