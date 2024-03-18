@@ -471,7 +471,7 @@ check_voice_records() {
 
 function rewrite_monofon_data() {
     if ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
-        file="/tmp/monofon-health/rewrite-monofon-data-row-count.txt"
+        file="/tmp/monofon-health/rowcount.txt"
         if [[ -f /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php ]] && ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
             if [[ $(date "+%H:%M") == "01:00" ]]; then
                 if screen -dm php /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php $(date -d "yesterday" '+%Y-%m-%d'); then
@@ -498,13 +498,13 @@ function check_data_file() {
         if [ "$before" == "$now" ]; then
             alarm_check_down "data-json" "No changes made to file: $data_file"
             print_colour "data.json" "not updated"
-            else 
+        else
             alarm_check_up "data-json" "Data file updated. File: $data_file"
             print_colour "data.json" "updated"
         fi
-    echo "$now" > $data_timestamp
+        echo "$now" >$data_timestamp
     fi
-    stat -c %y $data_file > $data_timestamp
+    stat -c %y $data_file >$data_timestamp
 }
 
 function main() {
@@ -547,7 +547,9 @@ function main() {
             check_voice_records
         fi
     fi
-    check_data_file
+    if ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
+        check_data_file
+    fi
     rewrite_monofon_data
 }
 
