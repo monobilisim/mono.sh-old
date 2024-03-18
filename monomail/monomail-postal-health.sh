@@ -61,11 +61,11 @@ function alarm_check_down() {
         current_date=$(date "+%Y-%m-%d")
         if [ "${old_date}" != "${current_date}" ]; then
             date "+%Y-%m-%d %H:%M" >"${file_path}"
-            alarm "[Postal - $IDENTIFIER] [:red_circle:] $2"
+            alarm "[Postal][$IDENTIFIER] [:red_circle:] $2"
         fi
     else
         date "+%Y-%m-%d %H:%M" >"${file_path}"
-        alarm "[Postal - $IDENTIFIER] [:red_circle:] $2"
+        alarm "[Postal][$IDENTIFIER] [:red_circle:] $2"
     fi
 
 }
@@ -82,7 +82,7 @@ function alarm_check_up() {
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
         rm -rf "${file_path}"
-        alarm "[Postal - $IDENTIFIER] [:check:] $2"
+        alarm "[Postal][$IDENTIFIER] [:check:] $2"
     fi
 
 }
