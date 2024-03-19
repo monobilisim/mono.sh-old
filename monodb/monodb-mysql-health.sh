@@ -156,10 +156,10 @@ function check_flow_control() {
     name=$(echo "$output" | awk '{print $1}')
     stop_time=$(echo "$output" | awk '{print $2}' | cut -c 1)
     if [ "$stop_time" -gt 0 ]; then
-        alarm_check_down "is_synced" "Replication paused by Flow Control more than 1 second - $stop_time"
+        alarm_check_down "flow" "Replication paused by Flow Control more than 1 second - $stop_time"
         print_colour "Replication pause time" "$stop_time" "error"
     else
-        alarm_check_up "is_synced" "Replication paused by Flow Control less than 1 second again - $stop_time"
+        alarm_check_up "flow" "Replication paused by Flow Control less than 1 second again - $stop_time"
         print_colour "Replication pause time" "$stop_time"
     fi
 }
@@ -169,7 +169,7 @@ function check_db() {
     tables=$(echo "$check_out" | sed -n '/Repairing tables/,$p' | tail -n +2)
     message=""
     if [ -n "$tables" ]; then
-        message="[Monofon - $IDENTIFIER] [:info:] MySQL - \`mysqlcheck --auto-repair --all-databases\` result"
+        message="[MySQL - $IDENTIFIER] [:info:] MySQL - \`mysqlcheck --auto-repair --all-databases\` result"
     fi
     oldIFS=$IFS
     IFS=$'\n'
