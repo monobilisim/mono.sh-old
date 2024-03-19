@@ -77,6 +77,18 @@ function alarm_check_up() {
     fi
 }
 
+function select_now() {
+    echo_status "MySQL Access:"
+    if mysql -sNe "SELECT NOW();" >/dev/null; then
+        alarm_check_up "now" "Can run 'SELECT' statements again"
+        print_colour "MySQL" "accessible"
+    else
+        alarm_check_down "now" "Couldn't run a 'SELECT' statement on MySQL"
+        print_colour "MySQL" "not accessible" "error"
+        exit 1
+    fi
+}
+
 function check_process_count() {
     echo_status "Number of Processes:"
     processlist_count=$(/usr/bin/mysqladmin processlist | grep -vc 'show processlist')
@@ -152,9 +164,29 @@ function check_flow_control() {
     fi
 }
 
+function check_db() {
+    check_out=$(mysqlcheck --auto-repair --all-databases)
+    tables=$(echo "$check_out" | sed -n '/Repairing tables/,$p' | tail -n +2)
+    message=""
+    if [ -n "$tables" ]; then
+        message="[Monofon - $IDENTIFIER] [:info:] MySQL - \`mysqlcheck --auto-repair --all-databases\` result"
+    fi
+    oldIFS=$IFS
+    IFS=$'\n'
+    for table in $tables; do
+        message="$message\n$table"
+    done
+    if [ -n "$message" ]; then
+        alarm "$message"
+    fi
+    IFS=$oldIFS
+}
+
 function main() {
     printf '\n'
-    echo "Monodb MySQL Health $VERSION - $(date)"
+    echo  MonoDB MySQL Health $VERSION - "$(date)"  
+    printf '\n'
+    select_now
     printf '\n'
     check_process_count
     printf '\n'
@@ -163,6 +195,10 @@ function main() {
         check_node_status
         check_cluster_synced
         check_flow_control
+    fi
+
+    if [ "$(date "+%H:%M")" == "05:00" ]; then
+        check_db
     fi
 }
 
