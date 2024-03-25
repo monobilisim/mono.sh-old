@@ -48,11 +48,12 @@ fi
 
 queue_list=($(asterisk -rx "queue show" | grep strategy | awk '{print $1}'))
 for queue in ${queue_list[@]}; do
-        user_in_queue=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@" | perl -ne '/\((\S+)/ && print "$1\n"')
-        if [[ ! -z "$user_in_queue" ]]; then
+        member=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@" | perl -ne '/\((\S+)/ && print "$1\n"')
+        state_interface=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@" | perl -ne '/from (\S+)\)/ && print "$1\n"')
+        if [[ ! -z "$member" ]]; then
                 echo "User $EXTEN is in queue $queue"
-                asterisk -rx "queue remove member \"$user_in_queue\" from $queue"
-                asterisk -rx "queue add member \"$user_in_queue\" to $queue penalty 0 as \"$NAME\" state_interface SIP/$EXTEN"
+                asterisk -rx "queue remove member \"$member\" from $queue"
+                asterisk -rx "queue add member \"$member\" to $queue penalty 0 as \"$NAME\" state_interface $state_interface"
         else
                 echo "User $EXTEN is not in queue $queue, skipping..."
         fi
