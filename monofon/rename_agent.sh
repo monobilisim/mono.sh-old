@@ -40,22 +40,22 @@ mysql -e "UPDATE qstats.monofon_agent SET name = '$NAME' WHERE extension = $EXTE
 /usr/local/fop2/autoconfig-users.sh
 /etc/init.d/fop2 reload
 
-if [[ -n "$(whereis fwconsole)" ]]; then
-	fwconsole reload
+if [[ -n "$(which fwconsole)" ]]; then
+        fwconsole reload
 else
-	amportal a r
+        amportal a r
 fi
 
 queue_list=($(asterisk -rx "queue show" | grep strategy | awk '{print $1}'))
 for queue in ${queue_list[@]}; do
-	user_in_queue=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@" | grep -Po '(?<=\().+?(?=\))' | head -n 1)
-	if [[ ! -z "$user_in_queue" ]]; then
-		#echo "User $EXTEN is in queue $queue"
-		asterisk -rx "queue remove member \"$user_in_queue\" from $queue"
-		asterisk -rx "queue add member \"$user_in_queue\" to $queue penalty 0 as \"$NAME\""
-	else 
-		echo "User $EXTEN is not in queue $queue, skipping..."
-	fi
+        user_in_queue=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@" | perl -ne '/\((\S+)/ && print "$1\n"')
+        if [[ ! -z "$user_in_queue" ]]; then
+                echo "User $EXTEN is in queue $queue"
+                asterisk -rx "queue remove member \"$user_in_queue\" from $queue"
+                asterisk -rx "queue add member \"$user_in_queue\" to $queue penalty 0 as \"$NAME\" state_interface SIP/$EXTEN"
+        else
+                echo "User $EXTEN is not in queue $queue, skipping..."
+        fi
 done
 
 echo "---------------------------------------"
@@ -67,4 +67,3 @@ mysql -e "SELECT name FROM asterisk.users WHERE extension = $EXTEN;"
 mysql -e "SELECT label, queuechannel FROM asterisk.fop2buttons WHERE exten = $EXTEN;"
 mysql -e "SELECT name, queue FROM qstats.monofon_agent WHERE extension = $EXTEN AND date = CURDATE();"
 echo "---------------------------------------"
-
