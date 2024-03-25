@@ -52,8 +52,8 @@ for queue in ${queue_list[@]}; do
         state_interface=$(asterisk -rx "queue show $queue" | grep "Local/$EXTEN@" | perl -ne '/from (\S+)\)/ && print "$1\n"')
         if [[ ! -z "$member" ]]; then
                 echo "User $EXTEN is in queue $queue"
-                asterisk -rx "queue remove member \"$member\" from $queue"
-                asterisk -rx "queue add member \"$member\" to $queue penalty 0 as \"$NAME\" state_interface $state_interface"
+                asterisk -rx "queue remove member $member from $queue"
+                asterisk -rx "queue add member $member to $queue penalty 0 as \"$NAME\" state_interface $state_interface"
         else
                 echo "User $EXTEN is not in queue $queue, skipping..."
         fi
