@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of PostgreSQL and Patroni cluster
-VERSION=v0.2.0
+VERSION=v0.9.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
     exit 0
 }
 
-mkdir -p /tmp/monodb-pgsql-patroni-health
+mkdir -p /tmp/monodb-pgsql-health
 
-if [[ -f /etc/monodb-pgsql-patroni-health.conf ]]; then
-    . /etc/monodb-pgsql-patroni-health.conf
+if [[ -f /etc/monodb-pgsql-health.conf ]]; then
+    . /etc/monodb-pgsql-health.conf
 else
-    echo "Config file doesn't exists at /etc/monodb-pgsql-patroni-health.conf"
+    echo "Config file doesn't exists at /etc/monodb-pgsql-health.conf"
     exit 1
 fi
 
@@ -46,18 +46,18 @@ function alarm_check_down() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monodb-pgsql-patroni-health/patroni_${service_name}_status.txt"
+    file_path="/tmp/monodb-pgsql-health/patroni_${service_name}_status.txt"
 
     if [ -f "${file_path}" ]; then
         old_date=$(awk '{print $1}' <"$file_path")
         current_date=$(date "+%Y-%m-%d")
         if [ "${old_date}" != "${current_date}" ]; then
             date "+%Y-%m-%d %H:%M" >"${file_path}"
-            alarm "[Patroni - $IDENTIFIER] [:red_circle:] $2"
+            alarm "[PostgreSQL - $IDENTIFIER] [:red_circle:] $2"
         fi
     else
         date "+%Y-%m-%d %H:%M" >"${file_path}"
-        alarm "[Patroni - $IDENTIFIER] [:red_circle:] $2"
+        alarm "[PostgreSQL - $IDENTIFIER] [:red_circle:] $2"
     fi
 
 }
@@ -68,12 +68,38 @@ function alarm_check_up() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monodb-pgsql-patroni-health/patroni_${service_name}_status.txt"
+    file_path="/tmp/monodb-pgsql-health/patroni_${service_name}_status.txt"
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
         rm -rf "${file_path}"
-        alarm "[Patroni - $IDENTIFIER] [:check:] $2"
+        alarm "[PostgreSQL - $IDENTIFIER] [:check:] $2"
+    fi
+}
+
+function postgresql_status() {
+    echo_status "PostgreSQL Status"
+    if systemctl status postgresql*.service >/dev/null; then
+        print_colour "PostgreSQL" "Active"
+        alarm_check_up "postgresql" "PostgreSQL is active again!"
+    else
+        print_colour "PostgreSQL" "Active" "error"
+        alarm_check_down "postgresql" "PostgreSQL is not active!"
+    fi
+}
+
+function pgsql_uptime() {
+    # SELECT current_timestamp - pg_postmaster_start_time();
+    #su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3'
+    echo_status "PostgreSQL Uptime:"
+    if su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" >/dev/null; then
+        uptime="$(su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3')"
+        alarm_check_up "now" "Can run 'SELECT' statements again"
+        print_colour "Uptime" "$uptime"
+    else
+        alarm_check_down "now" "Couldn't run a 'SELECT' statement on PostgreSQL"
+        print_colour "Uptime" "not accessible" "error"
+        exit 1
     fi
 }
 
@@ -103,11 +129,11 @@ function cluster_role() {
     for cluster in "${cluster_names[@]}"; do
         print_colour "$cluster" "${cluster_roles[$i]}"
         if
-            [ -f /tmp/monodb-pgsql-patroni-health/raw_output.json ]
+            [ -f /tmp/monodb-pgsql-health/raw_output.json ]
         then
-            old_role="$(jq -r '.members['"$i"'] | .role' </tmp/monodb-pgsql-patroni-health/raw_output.json)"
+            old_role="$(jq -r '.members['"$i"'] | .role' </tmp/monodb-pgsql-health/raw_output.json)"
             if [ "${cluster_roles[$i]}" != "$old_role" ] &&
-                [ "$cluster" == "$(jq -r '.members['"$i"'] | .name' </tmp/monodb-pgsql-patroni-health/raw_output.json)" ]; then
+                [ "$cluster" == "$(jq -r '.members['"$i"'] | .name' </tmp/monodb-pgsql-health/raw_output.json)" ]; then
                 echo "  Role of $cluster has changed!"
                 print_colour "  Old Role of $cluster" "$old_role" "error"
                 printf '\n'
@@ -117,7 +143,7 @@ function cluster_role() {
         fi
         i=$((i + 1))
     done
-    echo "$output" | jq >/tmp/monodb-pgsql-patroni-health/raw_output.json
+    echo "$output" | jq >/tmp/monodb-pgsql-health/raw_output.json
 }
 
 function cluster_state() {
@@ -145,16 +171,22 @@ function cluster_state() {
 
 function main() {
     printf '\n'
-    echo "Monodb PostgreSQL Patroni Health $VERSION - $(date)"
+    echo "Monodb PostgreSQL Health $VERSION - $(date)"
     printf '\n'
-    patroni_status
+    postgresql_status
     printf '\n'
-    cluster_role
-    printf '\n'
-    cluster_state
+    pgsql_uptime
+    if [[ -n "$PATRONI_API" ]]; then
+        printf '\n'
+        patroni_status
+        printf '\n'
+        cluster_role
+        printf '\n'
+        cluster_state
+    fi
 }
 
-pidfile=/var/run/monodb-pgsql-patroni-health.sh.pid
+pidfile=/var/run/monodb-pgsql-health.sh.pid
 if [ -f ${pidfile} ]; then
     oldpid=$(cat ${pidfile})
 
@@ -171,3 +203,4 @@ echo $$ >${pidfile}
 main
 
 rm ${pidfile}
+

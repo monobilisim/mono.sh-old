@@ -560,20 +560,25 @@ function main() {
 
 pidfile=/var/run/monofon-health.sh.pid
 if [ -f ${pidfile} ]; then
-    oldpid=$(cat ${pidfile})
+    lastpid=$(cat ${pidfile})
 
-    if ! ps -p "${oldpid}" &>/dev/null; then
-        alarm_check_up "still_running" "Old process no longer runs."
-        rm ${pidfile} # pid file is stale, remove it
+    if ps -p "${lastpid}" &>/dev/null; then
+        if [ $(date "+%H") != "05" ]; then # mysqlcheck runs at 5 am and takes some time.
+            alarm_check_down "still_running" "Last process is still running."
+            echo "Last process is still running"
+            exit 1
+        fi
     else
-        alarm_check_down "still_running" "Old process is still running."
-        echo "Old process still running"
-        exit 1
+        alarm_check_up "still_running" "Last process no longer runs. Removing stale pid file."
+        rm ${pidfile} # pid file is stale, remove it
     fi
 fi
+
+alarm_check_up "still_running" "Last process completed."
 
 echo $$ >${pidfile}
 
 main
 
 rm ${pidfile}
+
