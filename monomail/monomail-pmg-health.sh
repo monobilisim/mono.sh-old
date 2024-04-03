@@ -108,6 +108,9 @@ function alarm_check_down() {
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
                         alarm "[PMG - $IDENTIFIER] [:red_circle:] $2"
+                        if [ $3 == "service" ] || [ $3 == "queue" ]; then
+                            check_active_sessions
+                        fi
                     fi
                 fi
             fi
@@ -141,15 +144,27 @@ function alarm_check_up() {
     fi
 }
 
+function check_active_sessions() {
+    active_sessions=($(ls /var/run/ssh-session))
+    if [[ ${#active_sessions[@]} == 0 ]]; then
+        return
+    else
+        for session in "${active_sessions[@]}"; do
+            user=$(jq -r .username /var/run/ssh-session/"$session")
+            alarm_check_down "session_$session" "User *$user* is connected to host"
+        done
+    fi
+}
+
 function check_pmg_services() {
     echo_status "PMG Services"
     for i in "${pmg_services[@]}"; do
         if systemctl status "$i" >/dev/null; then
-            alarm_check_up "$i" "Service $i is working again" "service"
             print_colour "$i" "running"
+            alarm_check_up "$i" "Service $i is working again" "service"
         else
-            alarm_check_down "$i" "Service $i is not working" "service"
             print_colour "$i" "not running" "error"
+            alarm_check_down "$i" "Service $i is not working" "service"
         fi
     done
 }
@@ -169,11 +184,11 @@ function queued_messages() {
     echo_status "Queued Messages"
     queue=$(mailq | grep -c "^[A-F0-9]")
     if [ "$queue" -lt $QUEUE_LIMIT ]; then
-        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT" "queue"
         print_colour "Number of queued messages" "$queue"
+        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT" "queue"
     else
-        alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"
         print_colour "Number of queued messages" "$queue" "error"
+        alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"
     fi
 }
 

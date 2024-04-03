@@ -108,6 +108,9 @@ function alarm_check_down() {
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
                         alarm "[Zimbra - $IDENTIFIER] [:red_circle:] $2"
+                        if [ $3 == "service" ] || [ $3 == "queue" ]; then
+                            check_active_sessions
+                        fi
                     fi
                 fi
             fi
@@ -121,7 +124,7 @@ function alarm_check_up() {
     [[ -z $1 ]] && {
         echo "Service name is not defined"
         return
-    }   
+    }
     service_name=${1//\//-}
     file_path="/tmp/monomail-zimbra-health/postal_${service_name}_status.txt"
 
@@ -138,6 +141,18 @@ function alarm_check_up() {
                 alarm "[Zimbra - $IDENTIFIER] [:check:] $2"
             fi
         fi
+    fi
+}
+
+function check_active_sessions() {
+    active_sessions=($(ls /var/run/ssh-session))
+    if [[ ${#active_sessions[@]} == 0 ]]; then
+        return
+    else
+        for session in "${active_sessions[@]}"; do
+            user=$(jq -r .username /var/run/ssh-session/"$session")
+            alarm_check_down "session_$session" "User *$user* is connected to host"
+        done
     fi
 }
 
@@ -251,8 +266,8 @@ function check_zimbra_services() {
                     echo "${RED_FG}Couldn't restart stopped services in $((RESTART_LIMIT + 1)) tries${RESET}"
                     return
                 }
-                alarm_check_down "$service_name" "Service: $service_name is not running" "service"
                 print_colour "$service_name" "$is_active" "error"
+                alarm_check_down "$service_name" "Service: $service_name is not running" "service"
                 if [ $RESTART == 1 ]; then
                     # i=$(echo "${ZIMBRA_SERVICES[@]}" | sed 's/ /\n/g' | grep "$service_name:")
                     # zimbra_service_name=$(echo $i | cut -d \: -f1)
@@ -289,8 +304,8 @@ function check_zimbra_services() {
                 fi
                 # should_restart=1
             else
-                alarm_check_up "$service_name" "Service: $service_name started running" "service"
                 print_colour "$service_name" "$is_active"
+                alarm_check_up "$service_name" "Service: $service_name started running" "service"
             fi
         fi
     done
@@ -315,12 +330,12 @@ function queued_messages() {
     else
         queue=$(/opt/zextras/common/sbin/mailq | grep -c "^[A-F0-9]")
     fi
-    if [ "$queue" -lt $QUEUE_LIMIT ]; then
-        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT" "queue"
+    if [ "$queue" == "$QUEUE_LIMIT" ]; then
         print_colour "Number of queued messages" "$queue"
+        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT" "queue"
     else
-        alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"
         print_colour "Number of queued messages" "$queue" "error"
+        alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"
     fi
 }
 
@@ -335,6 +350,8 @@ function main() {
     check_z-push
     printf '\n'
     queued_messages
+
+    rm -rf /tmp/monomail-zimbra-health/postal_session_*_status.txt
 }
 
 pidfile=/var/run/monomail-zimbra-health.sh.pid
