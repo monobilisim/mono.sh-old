@@ -34,6 +34,10 @@ if [ -z "$(command -v yq)" ]; then
     esac
 fi
 
+if [ -z "$ALARM_INTERVAL" ]; then
+    ALARM_INTERVAL=5
+fi
+
 RED_FG=$(tput setaf 1)
 GREEN_FG=$(tput setaf 2)
 BLUE_FG=$(tput setaf 4)
@@ -47,7 +51,7 @@ function alarm() {
     fi
 }
 
-function alarm_check_down() {
+function get_time_diff() {
     [[ -z $1 ]] && {
         echo "Service name is not defined"
         return
@@ -57,17 +61,65 @@ function alarm_check_down() {
     file_path="/tmp/monomail-postal-health/postal_${service_name}_status.txt"
 
     if [ -f "${file_path}" ]; then
-        old_date=$(awk '{print $1}' <"$file_path")
-        current_date=$(date "+%Y-%m-%d")
-        if [ "${old_date}" != "${current_date}" ]; then
+
+        old=$(date -d "$(awk '{print $1, $2}' <"${file_path}")" +%s)
+        new=$(date -d "$(date '+%Y-%m-%d %H:%M')" +%s)
+
+        time_diff=$(((new - old) / 60))
+
+        if ((time_diff >= RESTART_ATTEMPT_INTERVAL)); then
             date "+%Y-%m-%d %H:%M" >"${file_path}"
-            alarm "[Postal][$IDENTIFIER] [:red_circle:] $2"
         fi
     else
         date "+%Y-%m-%d %H:%M" >"${file_path}"
-        alarm "[Postal][$IDENTIFIER] [:red_circle:] $2"
+        time_diff=0
     fi
 
+    echo $time_diff
+}
+
+function alarm_check_down() {
+    [[ -z $1 ]] && {
+        echo "Service name is not defined"
+        return
+    }
+    service_name=$1
+    service_name=$(echo "$service_name" | sed 's#/#-#g')
+    file_path="/tmp/monomail-postal-health/postal_${service_name}_status.txt"
+
+    if [ -z $3 ]; then
+        if [ -f "${file_path}" ]; then
+            old_date=$(awk '{print $1}' <"$file_path")
+            current_date=$(date "+%Y-%m-%d")
+            if [ "${old_date}" != "${current_date}" ]; then
+                date "+%Y-%m-%d %H:%M" >"${file_path}"
+                alarm "[Postal - $IDENTIFIER] [:red_circle:] $2"
+            fi
+        else
+            date "+%Y-%m-%d %H:%M" >"${file_path}"
+            alarm "[Postal - $IDENTIFIER] [:red_circle:] $2"
+        fi
+    else
+        if [ -f "${file_path}" ]; then
+            old_date=$(awk '{print $1}' <"$file_path")
+            [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
+            current_date=$(date "+%Y-%m-%d")
+            if [ "${old_date}" != "${current_date}" ]; then
+                date "+%Y-%m-%d %H:%M locked" >"${file_path}"
+                alarm "[Postal - $IDENTIFIER] [:red_circle:] $2"
+            else
+                if ! $locked; then
+                    time_diff=$(get_time_diff "$1")
+                    if ((time_diff >= ALARM_INTERVAL)); then
+                        date "+%Y-%m-%d %H:%M locked" >"${file_path}"
+                        alarm "[Postal - $IDENTIFIER] [:red_circle:] $2"
+                    fi
+                fi
+            fi
+        else
+            date "+%Y-%m-%d %H:%M" >"${file_path}"
+        fi
+    fi
 }
 
 function alarm_check_up() {
@@ -185,7 +237,7 @@ fnMySQL() {
 }
 fnMessageQueue() {
     if ! db_message_queue=$(mysql -h"$message_db_host" -P"$message_db_port" -u"$message_db_user" -p"$message_db_pass" -sNe "select count(*) from postal.queued_messages;" 2>&1); then
-        alarm_check_down "status_db_message_queue" "Couldn't retrieve message queue information from message_db at host $message_db_host with the parameters on $postal_config at $IDENTIFIER"
+        alarm_check_down "status_db_message_queue" "Couldn't retrieve message queue information from message_db at host $message_db_host with the parameters on $postal_config at $IDENTIFIER" "queue"
         db_message_queue_error="$db_message_queue"
         db_message_queue=-1
     else
@@ -198,10 +250,11 @@ fnMessageQueue() {
     elif [ "$db_message_queue" -eq -1 ]; then
         printf "  %-40s %s\n" "${BLUE_FG}Queued messages${RESET}" "${RED_FG}$db_message_queue_error${RESET}"
     else
-        alarm_check_down "db_message_queue" "Number of queued messages is above threshold - $db_message_queue/$message_threshold at $IDENTIFIER"
+        alarm_check_down "db_message_queue" "Number of queued messages is above threshold - $db_message_queue/$message_threshold at $IDENTIFIER" "queue"
         printf "  %-40s %s\n" "${BLUE_FG}Queued messages${RESET}" "are greater than ${RED_FG}$message_threshold - Queue: $db_message_queue${RESET}"
     fi
 }
+
 fnMessageHeld() {
     echo_status "Held Messages:"
     postal_servers=("$(mysql -h"$message_db_host" -P"$message_db_port" -u"$message_db_user" -p"$message_db_pass" -sNe "select id from postal.servers;" | sort -n)")

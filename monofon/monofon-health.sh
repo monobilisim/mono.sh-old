@@ -390,7 +390,6 @@ function alarm_check_down() {
             date "+%Y-%m-%d %H:%M" >"${file_path}"
         fi
     fi
-
 }
 
 function alarm_check_up() {

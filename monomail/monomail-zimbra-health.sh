@@ -17,6 +17,10 @@ else
     exit 1
 fi
 
+if [ -z "$ALARM_INTERVAL" ]; then
+    ALARM_INTERVAL=5
+fi
+
 RED_FG=$(tput setaf 1)
 GREEN_FG=$(tput setaf 2)
 BLUE_FG=$(tput setaf 4)
@@ -43,6 +47,33 @@ function alarm() {
     fi
 }
 
+function get_time_diff() {
+    [[ -z $1 ]] && {
+        echo "Service name is not defined"
+        return
+    }
+    service_name=$1
+    service_name=$(echo "$service_name" | sed 's#/#-#g')
+    file_path="/tmp/monomail-zimbra-health/postal_${service_name}_status.txt"
+
+    if [ -f "${file_path}" ]; then
+
+        old=$(date -d "$(awk '{print $1, $2}' <"${file_path}")" +%s)
+        new=$(date -d "$(date '+%Y-%m-%d %H:%M')" +%s)
+
+        time_diff=$(((new - old) / 60))
+
+        if ((time_diff >= RESTART_ATTEMPT_INTERVAL)); then
+            date "+%Y-%m-%d %H:%M" >"${file_path}"
+        fi
+    else
+        date "+%Y-%m-%d %H:%M" >"${file_path}"
+        time_diff=0
+    fi
+
+    echo $time_diff
+}
+
 function alarm_check_down() {
     [[ -z $1 ]] && {
         echo "Service name is not defined"
@@ -51,18 +82,39 @@ function alarm_check_down() {
     service_name=${1//\//-}
     file_path="/tmp/monomail-zimbra-health/postal_${service_name}_status.txt"
 
-    if [ -f "${file_path}" ]; then
-        old_date=$(awk '{print $1}' <"$file_path")
-        current_date=$(date "+%Y-%m-%d")
-        if [ "${old_date}" != "${current_date}" ]; then
+    if [ -z $3 ]; then
+        if [ -f "${file_path}" ]; then
+            old_date=$(awk '{print $1}' <"$file_path")
+            current_date=$(date "+%Y-%m-%d")
+            if [ "${old_date}" != "${current_date}" ]; then
+                date "+%Y-%m-%d %H:%M" >"${file_path}"
+                alarm "[Zimbra - $IDENTIFIER] [:red_circle:] $2"
+            fi
+        else
             date "+%Y-%m-%d %H:%M" >"${file_path}"
             alarm "[Zimbra - $IDENTIFIER] [:red_circle:] $2"
         fi
     else
-        date "+%Y-%m-%d %H:%M" >"${file_path}"
-        alarm "[Zimbra - $IDENTIFIER] [:red_circle:] $2"
+        if [ -f "${file_path}" ]; then
+            old_date=$(awk '{print $1}' <"$file_path")
+            [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
+            current_date=$(date "+%Y-%m-%d")
+            if [ "${old_date}" != "${current_date}" ]; then
+                date "+%Y-%m-%d %H:%M locked" >"${file_path}"
+                alarm "[Zimbra - $IDENTIFIER] [:red_circle:] $2"
+            else
+                if ! $locked; then
+                    time_diff=$(get_time_diff "$1")
+                    if ((time_diff >= ALARM_INTERVAL)); then
+                        date "+%Y-%m-%d %H:%M locked" >"${file_path}"
+                        alarm "[Zimbra - $IDENTIFIER] [:red_circle:] $2"
+                    fi
+                fi
+            fi
+        else
+            date "+%Y-%m-%d %H:%M" >"${file_path}"
+        fi
     fi
-
 }
 
 function alarm_check_up() {
@@ -186,11 +238,11 @@ function check_zimbra_services() {
         if [[ $is_active =~ [A-Z] ]]; then
             if [ "${is_active,,}" != 'running' ]; then
                 [ $RESTART_COUNTER -gt $RESTART_LIMIT ] && {
-                    alarm_check_down "$service_name" "Couldn't restart stopped services in $((RESTART_LIMIT + 1)) tries"
+                    alarm_check_down "$service_name" "Couldn't restart stopped services in $((RESTART_LIMIT + 1)) tries" "service"
                     echo "${RED_FG}Couldn't restart stopped services in $((RESTART_LIMIT + 1)) tries${RESET}"
                     return
                 }
-                alarm_check_down "$service_name" "Service: $service_name is not running"
+                alarm_check_down "$service_name" "Service: $service_name is not running" "service"
                 print_colour "$service_name" "$is_active" "error"
                 if [ $RESTART == 1 ]; then
                     # i=$(echo "${ZIMBRA_SERVICES[@]}" | sed 's/ /\n/g' | grep "$service_name:")
@@ -258,7 +310,7 @@ function queued_messages() {
         alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT"
         print_colour "Number of queued messages" "$queue"
     else
-        alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT"
+        alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"
         print_colour "Number of queued messages" "$queue" "error"
     fi
 }
