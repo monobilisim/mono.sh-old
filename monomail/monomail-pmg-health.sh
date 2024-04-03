@@ -127,8 +127,17 @@ function alarm_check_up() {
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
-        rm -rf "${file_path}"
-        alarm "[PMG - $IDENTIFIER] [:check:] $2"
+
+        if [ -z $3 ]; then
+            rm -rf "${file_path}"
+            alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+        else
+            [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
+            rm -rf "${file_path}"
+            if $locked; then
+                alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+            fi
+        fi
     fi
 }
 
@@ -136,7 +145,7 @@ function check_pmg_services() {
     echo_status "PMG Services"
     for i in "${pmg_services[@]}"; do
         if systemctl status "$i" >/dev/null; then
-            alarm_check_up "$i" "Service $i is working again"
+            alarm_check_up "$i" "Service $i is working again" "service"
             print_colour "$i" "running"
         else
             alarm_check_down "$i" "Service $i is not working" "service"
@@ -160,7 +169,7 @@ function queued_messages() {
     echo_status "Queued Messages"
     queue=$(mailq | grep -c "^[A-F0-9]")
     if [ "$queue" -lt $QUEUE_LIMIT ]; then
-        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT"
+        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT" "queue"
         print_colour "Number of queued messages" "$queue"
     else
         alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"

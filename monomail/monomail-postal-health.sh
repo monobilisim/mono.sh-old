@@ -133,10 +133,18 @@ function alarm_check_up() {
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
-        rm -rf "${file_path}"
-        alarm "[Postal][$IDENTIFIER] [:check:] $2"
-    fi
 
+        if [ -z $3 ]; then
+            rm -rf "${file_path}"
+            alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+        else
+            [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
+            rm -rf "${file_path}"
+            if $locked; then
+                alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+            fi
+        fi
+    fi
 }
 
 if [ -z "$(command -v mysql)" ]; then
@@ -241,11 +249,11 @@ fnMessageQueue() {
         db_message_queue_error="$db_message_queue"
         db_message_queue=-1
     else
-        alarm_check_up "status_db_message_queue" "Able to retrieve message queue information from message_db at host $message_db_host at $IDENTIFIER"
+        alarm_check_up "status_db_message_queue" "Able to retrieve message queue information from message_db at host $message_db_host at $IDENTIFIER" "queue"
     fi
     echo_status "Message Queue:"
     if [ "$db_message_queue" -lt $message_threshold ] && ! [ "$db_message_queue" -lt 0 ]; then
-        alarm_check_up "db_message_queue" "Number of queued messages is back to normal - $db_message_queue/$message_threshold at $IDENTIFIER"
+        alarm_check_up "db_message_queue" "Number of queued messages is back to normal - $db_message_queue/$message_threshold at $IDENTIFIER" "queue"
         printf "  %-40s %s\n" "${BLUE_FG}Queued messages${RESET}" "are smaller than ${GREEN_FG}$message_threshold - Queue: $db_message_queue${RESET}"
     elif [ "$db_message_queue" -eq -1 ]; then
         printf "  %-40s %s\n" "${BLUE_FG}Queued messages${RESET}" "${RED_FG}$db_message_queue_error${RESET}"

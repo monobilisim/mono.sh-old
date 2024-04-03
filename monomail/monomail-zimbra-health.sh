@@ -121,14 +121,23 @@ function alarm_check_up() {
     [[ -z $1 ]] && {
         echo "Service name is not defined"
         return
-    }
+    }   
     service_name=${1//\//-}
     file_path="/tmp/monomail-zimbra-health/postal_${service_name}_status.txt"
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
-        rm -rf "${file_path}"
-        alarm "[Zimbra - $IDENTIFIER] [:check:] $2"
+
+        if [ -z $3 ]; then
+            rm -rf "${file_path}"
+            alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+        else
+            [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
+            rm -rf "${file_path}"
+            if $locked; then
+                alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+            fi
+        fi
     fi
 }
 
@@ -280,7 +289,7 @@ function check_zimbra_services() {
                 fi
                 # should_restart=1
             else
-                alarm_check_up "$service_name" "Service: $service_name started running"
+                alarm_check_up "$service_name" "Service: $service_name started running" "service"
                 print_colour "$service_name" "$is_active"
             fi
         fi
@@ -307,7 +316,7 @@ function queued_messages() {
         queue=$(/opt/zextras/common/sbin/mailq | grep -c "^[A-F0-9]")
     fi
     if [ "$queue" -lt $QUEUE_LIMIT ]; then
-        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT"
+        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT" "queue"
         print_colour "Number of queued messages" "$queue"
     else
         alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"
