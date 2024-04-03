@@ -130,12 +130,12 @@ function alarm_check_up() {
 
         if [ -z $3 ]; then
             rm -rf "${file_path}"
-            alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+            alarm "[Zimbra - $IDENTIFIER] [:check:] $2"
         else
             [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
             rm -rf "${file_path}"
             if $locked; then
-                alarm "[Monofon - $IDENTIFIER] [:check:] $2"
+                alarm "[Zimbra - $IDENTIFIER] [:check:] $2"
             fi
         fi
     fi
