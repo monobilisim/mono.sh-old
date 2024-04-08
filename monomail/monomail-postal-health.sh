@@ -196,11 +196,6 @@ else
     alarm_check_up "messagedb" "Able to connect messagedb at host $message_db_host at $IDENTIFIER"
 fi
 
-# ------- RabbitMQ stats -------
-mapfile -t rabbitmq_info_host < <(yq -r .rabbitmq.host $postal_config)
-rabbitmq_info_user=$(yq -r .rabbitmq.username $postal_config)
-rabbitmq_info_pass=$(yq -r .rabbitmq.password $postal_config)
-
 function echo_status() {
     echo "$1"
     echo ---------------------------------------------------
@@ -302,77 +297,6 @@ fnMessageHeld() {
     done
 }
 
-fnRabbitMQ() {
-    echo_status "RabbitMQ status:"
-    if [ ${#rabbitmq_info_host[@]} -eq 1 ]; then
-        if systemctl status rabbitmq-server >/dev/null; then
-            alarm_check_up "rabbitmq-server" "RabbitMQ is running again at $IDENTIFIER"
-            rabbitmq_status=$(curl -su "$rabbitmq_info_user":"$rabbitmq_info_pass" http://"${rabbitmq_info_host[0]}":"$rmq_port"/api/vhosts | jq -r ".[].cluster_state")
-            vhost_name="$(echo $rabbitmq_status | jq -r keys[$index])"
-            vhost_status=$(echo $rabbitmq_status | grep "$vhost_name" | cut -d \" -f4)
-            if [ "$vhost_status" = "running" ]; then
-                alarm_check_up "rabbitmq" "RabbitMQ $vhost_name is $vhost_status at $IDENTIFIER"
-                printf "  %-40s %s\n" "${BLUE_FG}$vhost_name${RESET}" "is ${GREEN_FG}$vhost_status${RESET}"
-            elif [ -z "$rabbitmq_status" ]; then
-                echo 3
-                alarm_check_down "rabbitmq" "Can't get status information for RabbitMQ at $IDENTIFIER".
-                echo "  Couldn't get a response from http://${rabbitmq_info_host[0]}:$rmq_port/api/vhosts"
-            else
-                echo 4
-                alarm_check_down "rabbitmq" "RabbitMQ $vhost_name is $vhost_status at $IDENTIFIER"
-                printf "  %-40s %s\n" "${BLUE_FG}$vhost_name${RESET}" "is ${RED_FG}$vhost_status${RESET}"
-            fi
-        else
-            echo 5
-            alarm_check_down "rabbitmq-server" "RabbitMQ is not running at $IDENTIFIER"
-            printf "  %-40s %s\n" "${BLUE_FG}RabbitMQ${RESET}" "is ${RED_FG}not running${RESET}"
-        fi
-    else
-        mapfile -t rabbitmq_info_host < <(yq -r .rabbitmq.host[] $postal_config)
-        rabbitmq_status=()
-        for rmq_host in "${rabbitmq_info_host[@]}"; do
-            host_stat=$(curl -su "$rabbitmq_info_user":"$rabbitmq_info_pass" http://"$rmq_host":"$rmq_port"/api/vhosts | jq -r ".[].cluster_state" 2>/dev/null)
-            if [ $? -eq 0 ]; then
-                rabbitmq_status+=("$host_stat")
-            else
-                printf "  %-40s %s\n" "${BLUE_FG}$rmq_host${RESET}" "${RED_FG}couldn't get status${RESET}"
-            fi
-        done
-        if [ -n "${rabbitmq_status[*]}" ]; then
-            reference="${rabbitmq_status[0]}"
-            statuslength="${#rabbitmq_status[@]}"
-            for i in $(seq 1 $((statuslength - 1))); do
-                if [ "$reference" != "${rabbitmq_status[$i]}" ]; then
-                    alarm_check_down "rmq_match" "RabbitMQ cluster statusses doesn't match"#TODO arrayi de gonder
-                    echo "RabbitMQ statusses doesn't match"
-                    echo "${rabbitmq_status[@]}"
-                    break
-                elif [ "$reference" == "${rabbitmq_status[$i]}" ] && [ "$i" -eq "$((statuslength - 1))" ]; then
-                    alarm_check_up "rmq_match" "RabbitMQ cluster statusses match again"
-                    number_of_vhosts="$(echo "${rabbitmq_status[$i]}" | jq -r '.[]' | wc -l)"
-                    for j in $(seq 1 "$number_of_vhosts"); do
-                        index="$((j - 1))"
-                        vhost_name="$(echo "${rabbitmq_status[$i]}" | jq -r keys[$index])"
-                        vhost_status=$(echo "${rabbitmq_status[$i]}" | grep "$vhost_name" | cut -d \" -f4)
-                        if [ "$vhost_status" = "running" ]; then
-                            alarm_check_up "$vhost_name" "RabbitMQ $vhost_name is $vhost_status at $IDENTIFIER"
-                            printf "  %-40s %s\n" "${BLUE_FG}$vhost_name${RESET}" "is ${GREEN_FG}$vhost_status${RESET}"
-                        elif [ -z "$rabbitmq_status" ]; then
-                            alarm_check_down "rabbitmq" "Can't get status information for RabbitMQ at $IDENTIFIER".
-                            echo "  Couldn't get a response from http://${rabbitmq_info_host[0]}:$rmq_port/api/vhosts"
-                        else
-                            alarm_check_down "$vhost_name" "RabbitMQ $vhost_name is $vhost_status at $IDENTIFIER"
-                            printf "  %-40s %s\n" "${BLUE_FG}$vhost_name${RESET}" "is ${RED_FG}$vhost_status${RESET}"
-                        fi
-                    done
-                fi
-                reference="${rabbitmq_status[$i]}"
-            done
-
-        fi
-    fi
-}
-
 main() {
     fnServices
     printf '\n'
@@ -384,7 +308,6 @@ main() {
         fnMessageHeld
         printf '\n'
     fi
-    fnRabbitMQ
 }
 
 pidfile=/var/run/monomail-postal-health.sh.pid
