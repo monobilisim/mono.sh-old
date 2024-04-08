@@ -339,10 +339,20 @@ function queued_messages() {
     fi
 }
 
+function check_install() {
+    mapfile -t ps_out < <(ps aux | grep install.sh)
+    if [ ${#ps_out[@]} -gt 1 ]; then
+        echo install.sh is working
+        echo Exiting...
+        exit 1
+    fi
+}
+
 function main() {
     printf '\n'
     echo "Monomail Zimbra Health $VERSION - $(date)"
     printf '\n'
+    check_install
     check_ip_access
     printf '\n'
     check_zimbra_services
