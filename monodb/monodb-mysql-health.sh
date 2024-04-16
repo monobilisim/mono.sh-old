@@ -35,9 +35,17 @@ function print_colour() {
 }
 
 function alarm() {
-    if [ "$SEND_ALARM" == "1" ]; then
-        curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
-    fi
+      if [ "$SEND_ALARM" == "1" ]; then
+          curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
+      fi
+	
+      if [ "$SEND_DM_ALARM" = "1" ] && [ -n "$ALARM_BOT_API_KEY" ] && [ -n "$ALARM_BOT_EMAIL" ] && [ -n "$ALARM_BOT_API_URL" ] && [ -n "$ALARM_BOT_USER_EMAIL" ]; then
+            curl -s -X POST "$ALARM_BOT_API_URL"/api/v1/messages \
+                -u "$ALARM_BOT_EMAIL:$ALARM_BOT_API_KEY" \
+                --data-urlencode type=direct \
+                --data-urlencode "to=$ALARM_BOT_USER_EMAIL" \
+                --data-urlencode "content=$1" 1> /dev/null
+      fi
 }
 
 function alarm_check_down() {
