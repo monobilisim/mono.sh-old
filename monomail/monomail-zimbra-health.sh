@@ -54,7 +54,7 @@ function get_time_diff() {
     }
     service_name=$1
     service_name=$(echo "$service_name" | sed 's#/#-#g')
-    file_path="/tmp/monomail-zimbra-health/postal_${service_name}_status.txt"
+    file_path="/tmp/monomail-zimbra-health/zimbra_${service_name}_status.txt"
 
     if [ -f "${file_path}" ]; then
 
@@ -80,7 +80,7 @@ function alarm_check_down() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monomail-zimbra-health/postal_${service_name}_status.txt"
+    file_path="/tmp/monomail-zimbra-health/zimbra_${service_name}_status.txt"
 
     if [ -z $3 ]; then
         if [ -f "${file_path}" ]; then
@@ -126,7 +126,7 @@ function alarm_check_up() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monomail-zimbra-health/postal_${service_name}_status.txt"
+    file_path="/tmp/monomail-zimbra-health/zimbra_${service_name}_status.txt"
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
@@ -361,7 +361,7 @@ function main() {
     printf '\n'
     queued_messages
 
-    rm -rf /tmp/monomail-zimbra-health/postal_session_*_status.txt
+    rm -rf /tmp/monomail-zimbra-health/zimbra_session_*_status.txt
 }
 
 pidfile=/var/run/monomail-zimbra-health.sh.pid
