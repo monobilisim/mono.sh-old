@@ -330,14 +330,14 @@ function queued_messages() {
     else
         queue=$(/opt/zextras/common/sbin/mailq | grep -c "^[A-F0-9]")
     fi
-    if [ "$queue" == "$QUEUE_LIMIT" ]; then
+    if [ "$queue" -le "$QUEUE_LIMIT" ]; then
         print_colour "Number of queued messages" "$queue"
-        alarm_check_up "queued" "Number of queued messages is acceptable - $queue/$QUEUE_LIMIT" "queue"
     else
         print_colour "Number of queued messages" "$queue" "error"
         alarm_check_down "queued" "Number of queued messages is above limit - $queue/$QUEUE_LIMIT" "queue"
     fi
 }
+
 
 function check_install() {
     mapfile -t ps_out < <(ps aux | grep install.sh)
