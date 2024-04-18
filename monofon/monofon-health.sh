@@ -474,14 +474,14 @@ function rewrite_monofon_data() {
         if [[ -f /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php ]] && ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
             if [[ $(date "+%H:%M") == "01:00" ]]; then
                 if screen -dm php /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php $(date -d "yesterday" '+%Y-%m-%d'); then
-                    alarm "Monofon verilerin yeniden yazılması başlatıldı"
+                    #alarm "Monofon verilerin yeniden yazılması başlatıldı"
                 fi
             fi
         fi
 
         if [ -f $file ]; then
             row_count=$(cat $file)
-            alarm "Monofon verilerin yeniden yazılması tamamlandı. Satır sayısı: $row_count"
+            #alarm "Monofon verilerin yeniden yazılması tamamlandı. Satır sayısı: $row_count"
             rm $file
         fi
     fi
