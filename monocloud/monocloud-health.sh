@@ -1,5 +1,5 @@
 #!/bin/bash
-###~ descrtiption: This script is used to check the health of the server
+###~ description: This script is used to check the health of the server
 #~ variables
 script_version="v3.0.0"
 
