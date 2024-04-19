@@ -35,25 +35,25 @@ function print_colour() {
 }
 
 function alarm() {
-      if [ "$SEND_ALARM" == "1" ]; then
-          if [ -z "$ALARM_WEBHOOK_URLS" ]; then
-	    curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
-	  else
-	    for webhook in "${ALARM_WEBHOOK_URLS[@]}"; do
-		curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$webhook" 1>/dev/null
-	    done
-	  fi
-      fi
-	
-      if [ "$SEND_DM_ALARM" = "1" ] && [ -n "$ALARM_BOT_API_KEY" ] && [ -n "$ALARM_BOT_EMAIL" ] && [ -n "$ALARM_BOT_API_URL" ] && [ -n "$ALARM_BOT_USER_EMAILS" ]; then
-            for user_email in "${ALARM_BOT_USER_EMAILS[@]}"; do
-		curl -s -X POST "$ALARM_BOT_API_URL"/api/v1/messages \
-		    -u "$ALARM_BOT_EMAIL:$ALARM_BOT_API_KEY" \
-		    --data-urlencode type=direct \
-		    --data-urlencode "to=$user_email" \
-		    --data-urlencode "content=$1" 1> /dev/null
-	    done
-      fi
+    if [ "$SEND_ALARM" == "1" ]; then
+        if [ -z "$ALARM_WEBHOOK_URLS" ]; then
+            curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
+        else
+            for webhook in "${ALARM_WEBHOOK_URLS[@]}"; do
+                curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$webhook" 1>/dev/null
+            done
+        fi
+    fi
+
+    if [ "$SEND_DM_ALARM" = "1" ] && [ -n "$ALARM_BOT_API_KEY" ] && [ -n "$ALARM_BOT_EMAIL" ] && [ -n "$ALARM_BOT_API_URL" ] && [ -n "$ALARM_BOT_USER_EMAILS" ]; then
+        for user_email in "${ALARM_BOT_USER_EMAILS[@]}"; do
+            curl -s -X POST "$ALARM_BOT_API_URL"/api/v1/messages \
+                -u "$ALARM_BOT_EMAIL:$ALARM_BOT_API_KEY" \
+                --data-urlencode type=direct \
+                --data-urlencode "to=$user_email" \
+                --data-urlencode "content=$1" 1>/dev/null
+        done
+    fi
 }
 
 function alarm_check_down() {
@@ -108,14 +108,20 @@ function pgsql_uptime() {
     # SELECT current_timestamp - pg_postmaster_start_time();
     #su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3'
     echo_status "PostgreSQL Uptime:"
-    if su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" >/dev/null; then
+    if su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" &>/dev/null; then
         uptime="$(su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3')"
         alarm_check_up "now" "Can run 'SELECT' statements again"
         print_colour "Uptime" "$uptime"
     else
-        alarm_check_down "now" "Couldn't run a 'SELECT' statement on PostgreSQL"
-        print_colour "Uptime" "not accessible" "error"
-        exit 1
+        if su - iasdb -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" &>/dev/null; then
+            uptime="$(su - iasdb -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3')"
+            alarm_check_up "now" "Can run 'SELECT' statements again"
+            print_colour "Uptime" "$uptime"
+        else
+            alarm_check_down "now" "Couldn't run a 'SELECT' statement on PostgreSQL"
+            print_colour "Uptime" "not accessible" "error"
+            exit 1
+        fi
     fi
 }
 
@@ -219,4 +225,3 @@ echo $$ >${pidfile}
 main
 
 rm ${pidfile}
-
