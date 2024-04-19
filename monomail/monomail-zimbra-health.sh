@@ -63,7 +63,7 @@ function get_time_diff() {
 
         time_diff=$(((new - old) / 60))
 
-        if ((time_diff >= RESTART_ATTEMPT_INTERVAL)); then
+        if ((time_diff >= ALARM_INTERVAL)); then
             date "+%Y-%m-%d %H:%M" >"${file_path}"
         fi
     else
