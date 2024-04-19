@@ -22,7 +22,6 @@ There are scripts that provide more than one convenience in this collection
 | Folder | Description |
 |--|--|
 | [Backup Scripts](https://github.com/monobilisim/mono.sh/tree/main/backup) | Simple backup scripts |
-| [Backup Scripts](https://github.com/monobilisim/mono.sh/tree/main/backup) | Simple backup scripts |
 | [Install Scripts](https://github.com/monobilisim/mono.sh/tree/main/install) | Installation scripts for some programs |
 | [Let's Encrypt](https://github.com/monobilisim/mono.sh/tree/main/letsencrypt) | Scripts that simplify the use of Let's Encrypt |
 | [Mono Cloud](https://github.com/monobilisim/mono.sh/tree/main/monocloud) | Script Collection for Mono Cloud |
