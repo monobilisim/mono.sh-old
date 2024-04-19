@@ -1,4 +1,5 @@
 #!/bin/bash
+###~ description: Migrate PgSQL data to two servers
 
 backup_db() {
     [[ ! -d "$PWD/pgsqlbackup" ]] && mkdir -p "$PWD/pgsqlbackup"
