@@ -19,13 +19,13 @@ jobs:
           for a in $(find . -maxdepth 1 -type d -not -path '*/\.*' \( ! -iname ".*" \) | grep -v config | sort); do
              directory="$(basename $a)"
              [[ ! -e $a/.dirinfo ]] && { DIRNAME="ERROR"; DIRINFO="$a/.dirinfo not defined..."; } || { DIRNAME="$(cat $a/.dirinfo | grep 'name:' | cut -d ' ' -f2- )"; DIRINFO="$(cat $a/.dirinfo | grep 'description:' | cut -d ' ' -f2-)"; }
-             echo -e "| [${DIRNAME}](https://github.com/${{github.repository}}/tree/main/$(basename $a)) | ${DIRINFO} |" >> README.md
+             echo -e "| [${DIRNAME}](https://github.com/monobilisim/mono.sh/tree/main/$(basename $a)) | ${DIRINFO} |" >> README.md
              pushd $a
              [[ -e "README.md" ]] && rm README.md
              echo -e "| Script | Description |\n|--|--|" > README.md
              for b in $(find . -type f -iname "*.sh" | sort); do
                 filename="$(basename $b)"
-                fileurl="https://github.com/${{github.repository}}/blob/main/$directory/$filename"
+                fileurl="https://github.com/monobilisim/mono.sh/blob/main/$directory/$filename"
                 filedescription="$(cat $b | grep '###~ description' | awk -F ': ' '{print $2}')"
                 echo -e "| [$filename]($fileurl) | $filedescription |" >> README.md
              done

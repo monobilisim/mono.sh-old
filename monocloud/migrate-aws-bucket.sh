@@ -1,24 +1,27 @@
 #!/bin/bash
+###~ description: Migrate aws bucket to two accounts
 
 usage() {
 	echo -e "Usage: $0 [-d <param>] [-s <param>] [-h]"
 	echo -e '\t-d | --destination "aws-bucket|aws-access-key|aws-secret-key|aws-region" : Destination bucket info'
-	echo -e '\t-D | --dry-run     											            : Dry run'
+	echo -e '\t-D | --dry-run                                                           : Dry run'
+ 	echo -e '\t-p | --public                                                            : Make dest bucket to public.'
 	echo -e '\t-s | --source      "aws-bucket|aws-access-key|aws-secret-key|aws-region" : Source bucket info'
 	echo -e "\t-h | --help                                                              : Print this message."
 }
 
 
 main() {
-	opt=($(getopt -l "destination:,dry-run,source:,help" -o "d:,D,s:,h" -n "$0" -- "$@"))
-	[[ "${#opt[@]}" == "1" ]] && { usage; exit 1; }
+	opt=($(getopt -l "destination:,dry-run,public,source:,help" -o "d:,D,p,s:,h" -n "$0" -- "$@"))
+ 	[[ "${#opt[@]}" == "1" ]] && { usage; exit 1; }
 	eval set -- "${opt[@]}"
 
 	oldIFS=$IFS
 	while true; do
-		[[ "$1" == '-d' ]] || [[ "$1" == '--destination' ]] && { [[ -n $2 ]] && IFS='|' dest_info=($2)  ; }
-		[[ "$1" == '-s' ]] || [[ "$1" == '--source'      ]] && { [[ -n $2 ]] && IFS='|' source_info=($2); }
-		[[ "$1" == '-D' ]] || [[ "$1" == '--dry-run'     ]] && { dry_run=1; }
+                [[ "$1" == '-d' ]] || [[ "$1" == '--destination' ]] && { [[ -n $2 ]] && IFS='|' dest_info=($2)  ; }
+                [[ "$1" == '-s' ]] || [[ "$1" == '--source'      ]] && { [[ -n $2 ]] && IFS='|' source_info=($2); }
+                [[ "$1" == '-p' ]] || [[ "$1" == '--public'      ]] && { is_public_bucket=1; }
+                [[ "$1" == '-D' ]] || [[ "$1" == '--dry-run'     ]] && { dry_run=1; }
 		shift
 		[[ "$1" == '--' ]] && break
 	done
@@ -66,40 +69,63 @@ main() {
 	[[ -z $(grep -A5 "destination" ~/.config/rclone/rclone.conf | grep location_constraint) ]] && echo "location_constraint = $dest_region" >> ~/.config/rclone/rclone.conf
 
 	if [[ -z "$dry_run" ]]; then
-		echo "===> Creating destination bucket"
-		aws s3 mb --profile destination s3://${dest_bucket}-tmp
-		aws s3api put-public-access-block --profile destination --bucket ${dest_bucket}-tmp --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
-		aws s3api put-bucket-policy --bucket ${dest_bucket}-tmp --profile destination --policy '{
-			"Version": "2012-10-17",
-			"Statement": [
-				{
-					"Sid": "PublicReadGetObject",
-					"Effect": "Allow",
-					"Principal": "*",
-					"Action": "s3:GetObject",
-					"Resource": "arn:aws:s3:::'${dest_bucket}-tmp'/*"
-				}
-			]
-		}'
-		echo "===> Syncing source bucket to destination bucket"
-		rclone sync source:$source_bucket destination:${dest_bucket}-tmp
-		aws s3 ls --profile destination s3://${dest_bucket}-tmp
-		echo "===> Deleting source bucket"
-		read -p "Bucket $source_bucket will be deleted, are you sure? (y/N): "
-		if [[ $REPLY =~ ^[Yy]$ ]]; then
-			aws s3 rb --profile source s3://$source_bucket --force
-		fi
-		start_time=$(date +%s)
-		aws s3 mb --profile destination s3://$dest_bucket >/dev/null 2>&1
-		while [[ $? -ne 0 ]]; do
-			echo "===> Bucket $dest_bucket already exists, waiting 5s... ($(($(date +%s) - start_time)) seconds)"
-			sleep 5
-			aws s3 mb --profile destination s3://$dest_bucket > /dev/null 2>&1
-		done
-		end_time=$(date +%s)
-		aws s3 cp --profile destination s3://${dest_bucket}-tmp s3://$dest_bucket --recursive
-		echo "===> Migration completed in $((end_time - start_time)) seconds"
-	fi
+                echo "===> Creating destination bucket (Public: $is_public_bucket)"
+                aws s3 mb --profile destination s3://${dest_bucket}-tmp
+                if [[ "$is_public_bucket" == "1" ]]; then
+                        aws s3api put-public-access-block --profile destination --bucket ${dest_bucket}-tmp --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+                        aws s3api put-bucket-policy --bucket ${dest_bucket}-tmp --profile destination --policy '{
+                                "Version": "2012-10-17",
+                                "Statement": [
+                                        {
+                                                "Sid": "PublicReadGetObject",
+                                                "Effect": "Allow",
+                                                "Principal": "*",
+                                                "Action": "s3:GetObject",
+                                                "Resource": "arn:aws:s3:::'${dest_bucket}-tmp'/*"
+                                        }
+                                ]
+                        }'
+                fi
+                echo "===> Syncing source bucket to destination bucket"
+                rclone sync source:$source_bucket destination:${dest_bucket}-tmp
+                aws s3 ls --profile destination s3://${dest_bucket}-tmp
+                echo "===> Deleting source bucket"
+                read -p "Bucket $source_bucket will be deleted, are you sure? (y/N): "
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                        aws s3 rb --profile source s3://$source_bucket --force
+                fi
+                start_time=$(date +%s)
+                aws s3 mb --profile destination s3://$dest_bucket >/dev/null 2>&1
+                while [[ $? -ne 0 ]]; do
+                        echo "===> Bucket $dest_bucket already exists, waiting 5s... ($(($(date +%s) - start_time)) seconds)"
+                        sleep 5
+                        aws s3 mb --profile destination s3://$dest_bucket > /dev/null 2>&1
+                done
+                end_time=$(date +%s)
+                aws s3 cp --profile destination s3://${dest_bucket}-tmp s3://$dest_bucket --recursive
+                echo "===> Deleting destination-tmp bucket"
+                read -p "Bucket ${dest_bucket}-tmp will be deleted, are you sure? (y/N): "
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                        aws s3 rb --profile destination s3://${dest_bucket}-tmp --force
+                fi
+
+                if [[ "$is_public_bucket" == "1" ]]; then
+                        aws s3api put-public-access-block --profile destination --bucket ${dest_bucket} --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+                        aws s3api put-bucket-policy --bucket ${dest_bucket} --profile destination --policy '{
+                                "Version": "2012-10-17",
+                                "Statement": [
+                                        {
+                                                "Sid": "PublicReadGetObject",
+                                                "Effect": "Allow",
+                                                "Principal": "*",
+                                                "Action": "s3:GetObject",
+                                                "Resource": "arn:aws:s3:::'${dest_bucket}-tmp'/*"
+                                        }
+                                ]
+                        }'
+                fi
+                echo "===> Migration completed in $((end_time - start_time)) seconds"
+        fi
 }
 
 
