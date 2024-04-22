@@ -18,7 +18,7 @@ else
 fi
 
 if [ -z "$ALARM_INTERVAL" ]; then
-    ALARM_INTERVAL=5
+    ALARM_INTERVAL=3
 fi
 
 RED_FG=$(tput setaf 1)
