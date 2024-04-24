@@ -192,7 +192,7 @@ report_status() {
     [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
 
     local underthreshold_disk=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Bölüm kullanım seviyesi aşağıdaki bölümler için %$PART_USE_LIMIT seviyesinin altına indi;\n\`\`\`\n"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table+='\n'
     for z in $(seq 1 110); do table+="$(printf '-')"; done
@@ -216,13 +216,13 @@ report_status() {
         done
         message+="$table\n\`\`\`\"}"
         IFS=$oldifs
-        #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "Underthreshold için bugün gönderilecek alarm yok..."; }
-        [[ "$underthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "Underthreshold (DISK) için bugün gönderilecek alarm yok..."; }
+        #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Underthreshold today..."; }
+        [[ "$underthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
     fi
 
 
     local overthreshold_disk=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Bölüm kullanım seviyesi aşağıdaki bölümler için %$PART_USE_LIMIT seviyesinin üstüne çıktı;\n\`\`\`\n"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')\n"
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber > $PART_USE_LIMIT)")" ]]; then
@@ -253,27 +253,27 @@ report_status() {
         done
         message+="$table\n\`\`\`\"}"
         IFS=$oldifs
-        #[[ "$overthreshold_disk" == "1" ]] && echo $message || { echo "Overthreshold için bugün gönderilecek alarm yok..."; }
-        [[ "$overthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "Overthreshold (DISK) için bugün gönderilecek alarm yok..."; }
+        #[[ "$overthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Overthreshold today."; }
+        [[ "$overthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Overthreshold (DISK) today..."; }
     fi
 
     local underthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Sistem yükü limiti $LOAD_LIMIT seviyesinin altına indi...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] System load limit went below $LOAD_LIMIT\"}"
     if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber < $LOAD_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/system_load" ]]; then
             underthreshold_system=1
             rm -f /tmp/monocloud-health/system_load
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         else
-            echo "Underthreshold (SYS) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Underthreshold (SYS) today..."
         fi
     fi
 
     local overthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Sistem yükü limiti $LOAD_LIMIT seviyesinin üstüne çıktı...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] The system load limit has exceeded $LOAD_LIMIT...\"}"
     if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/system_load" && "$(cat /tmp/monocloud-health/system_load)" == "$(date +%Y-%m-%d)" ]]; then
-            echo "Overthreshold (SYS) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Overthreshold (SYS) today..."
         else
             overthreshold_system=1
             date +%Y-%m-%d >/tmp/monocloud-health/system_load
@@ -282,22 +282,22 @@ report_status() {
     fi
 
     local underthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] RAM kullanımı limiti $RAM_LIMIT seviyesinin altına indi...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] RAM usage limit went below $RAM_LIMIT\"}"
     if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber < $RAM_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/ram_usage" ]]; then
             underthreshold_ram=1
             rm -f /tmp/monocloud-health/ram_usage
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         else
-            echo "Underthreshold (RAM) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Underthreshold (RAM) today..."
         fi
     fi
 
     local overthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] RAM kullanımı limiti $RAM_LIMIT seviyesinin üstüne çıktı...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] RAM usage limit has exceeded $RAM_LIMIT...\"}"
     if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > $RAM_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/ram_usage" && "$(cat /tmp/monocloud-health/ram_usage)" == "$(date +%Y-%m-%d)" ]]; then
-            echo "Overthreshold (RAM) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Overthreshold (RAM) today..."
         else
             overthreshold_ram=1
             date +%Y-%m-%d >/tmp/monocloud-health/ram_usage
