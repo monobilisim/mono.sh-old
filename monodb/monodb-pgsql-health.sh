@@ -171,7 +171,7 @@ function check_active_sessions() {
 
 function postgresql_status() {
     echo_status "PostgreSQL Status"
-    if systemctl status postgresql*.service >/dev/null; then
+    if systemctl status postgresql.service >/dev/null || systemctl status postgresql*.service >/dev/null; then
         print_colour "PostgreSQL" "Active"
         alarm_check_up "postgresql" "PostgreSQL is active again!"
     else
@@ -184,20 +184,26 @@ function pgsql_uptime() {
     # SELECT current_timestamp - pg_postmaster_start_time();
     #su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3'
     echo_status "PostgreSQL Uptime:"
-    if su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" &>/dev/null; then
-        uptime="$(su - postgres -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3')"
+    # shellcheck disable=SC2037
+    if grep iasdb /etc/passwd &>/dev/null; then
+        # shellcheck disable=SC2037
+        command="su - iasdb -c \"psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'\""
+    elif grep gitlab-psql /etc/passwd &>/dev/null; then
+        # shellcheck disable=SC2037
+        command="gitlab-psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'"
+    else
+        # shellcheck disable=SC2037
+        command="su - postgres -c \"psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'\""
+    fi
+
+    if eval "$command" &>/dev/null; then
+        uptime="$(eval $command | awk 'NR==3')"
         alarm_check_up "now" "Can run 'SELECT' statements again"
         print_colour "Uptime" "$uptime"
     else
-        if su - iasdb -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" &>/dev/null; then
-            uptime="$(su - iasdb -c "psql -c 'SELECT current_timestamp - pg_postmaster_start_time();'" | awk 'NR==3')"
-            alarm_check_up "now" "Can run 'SELECT' statements again"
-            print_colour "Uptime" "$uptime"
-        else
-            alarm_check_down "now" "Couldn't run a 'SELECT' statement on PostgreSQL"
-            print_colour "Uptime" "not accessible" "error"
-            exit 1
-        fi
+        alarm_check_down "now" "Couldn't run a 'SELECT' statement on PostgreSQL"
+        print_colour "Uptime" "not accessible" "error"
+        exit 1
     fi
 }
 
