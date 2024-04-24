@@ -356,8 +356,10 @@ function main() {
     check_ip_access
     printf '\n'
     check_zimbra_services
-    printf '\n'
-    check_z-push
+    if [ -n "$Z_URL" ]; then
+        printf '\n'
+        check_z-push
+    fi
     printf '\n'
     queued_messages
 
