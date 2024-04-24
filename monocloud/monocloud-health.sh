@@ -258,11 +258,12 @@ report_status() {
     fi
 
     local underthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] System load limit went below $LOAD_LIMIT\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] System load limit went below $LOAD_LIMIT "
     if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber < $LOAD_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/system_load" ]]; then
             underthreshold_system=1
             rm -f /tmp/monocloud-health/system_load
+            message+="(Current: $(echo $systemstatus | jq -r '.load'))...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         else
             echo "There's no alarm for Underthreshold (SYS) today..."
@@ -270,23 +271,25 @@ report_status() {
     fi
 
     local overthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] The system load limit has exceeded $LOAD_LIMIT...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] The system load limit has exceeded $LOAD_LIMIT "
     if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/system_load" && "$(cat /tmp/monocloud-health/system_load)" == "$(date +%Y-%m-%d)" ]]; then
             echo "There's no alarm for Overthreshold (SYS) today..."
         else
             overthreshold_system=1
             date +%Y-%m-%d >/tmp/monocloud-health/system_load
+            message+="(Current: $(echo $systemstatus | jq -r '.load'))...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         fi
     fi
 
     local underthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] RAM usage limit went below $RAM_LIMIT\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] RAM usage limit went below $RAM_LIMIT "
     if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber < $RAM_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/ram_usage" ]]; then
             underthreshold_ram=1
             rm -f /tmp/monocloud-health/ram_usage
+            message+="(Current: $(echo $systemstatus | jq -r '.ram'))...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         else
             echo "There's no alarm for Underthreshold (RAM) today..."
@@ -294,13 +297,14 @@ report_status() {
     fi
 
     local overthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] RAM usage limit has exceeded $RAM_LIMIT...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] RAM usage limit has exceeded $RAM_LIMIT }"
     if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > $RAM_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/ram_usage" && "$(cat /tmp/monocloud-health/ram_usage)" == "$(date +%Y-%m-%d)" ]]; then
             echo "There's no alarm for Overthreshold (RAM) today..."
         else
             overthreshold_ram=1
             date +%Y-%m-%d >/tmp/monocloud-health/ram_usage
+            message+="(Current: $(echo $systemstatus | jq -r '.ram'))...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         fi
     fi
