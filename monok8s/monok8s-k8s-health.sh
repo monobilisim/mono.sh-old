@@ -135,7 +135,12 @@ function check_pods() {
 function check_rke2_ingress_nginx() {
     # Check if master server has publishService as enabled and service as enabled on /var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx.yaml
     echo_status "RKE2 Ingress Nginx:"
+    
     INGRESS_NGINX_YAML="/var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx.yaml"
+    
+    if [ ! -f "$INGRESS_NGINX_YAML" ]; then
+	INGRESS_NGINX_YAML="/var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx-config.yaml"
+    fi
 
     if [[ -f "$INGRESS_NGINX_YAML" ]]; then
 	print_colour "$(basename $INGRESS_NGINX_YAML)" "exists"
