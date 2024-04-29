@@ -268,6 +268,25 @@ check_system_load_and_ram() {
     load=$(uptime | awk -F'average:' '{print $2}' | awk -F',' '{print $1}' | xargs)
     [[ $is_old == 0 ]] && ram_usage=$(free -m | awk '/Mem/{printf("%.2f", $3/$2*100)}') || ram_usage=$(free -m | awk '/Mem/{printf("%.2f", ($3-$6-$7)/$2*100)}')
     local json="{\"load\":\"$load\",\"ram\":\"$ram_usage\"}"
+
+    load_u=$(echo "$load" | awk -F  '.' '{print $1}')
+    if [[ $load_u -lt $LOAD_LIMIT ]]; then
+        message="System load limit went below $LOAD_LIMIT (Current: $load%)"
+        alarm_check_up "load" "$message" "system"
+    else
+        message="The system load limit has exceeded $LOAD_LIMIT (Current: $load%)"
+        alarm_check_down "load" "$message" "system"
+    fi
+
+    ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
+    if [[ $ram_u -lt $RAM_LIMIT ]]; then
+        message="RAM usage limit went below $RAM_LIMIT (Current: $ram_usage%)"
+        alarm_check_up "ram" "$message" "system"
+    else
+        message="RAM usage limit has exceeded $RAM_LIMIT (Current: $ram_usage%)"
+        alarm_check_down "ram" "$message" "system"
+    fi
+
     echo $json
 }
 
@@ -390,23 +409,6 @@ report_status() {
         #[[ "$overthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Overthreshold today."; }
         [[ "$overthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Overthreshold (DISK) today..."; }
     fi
-
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber < $LOAD_LIMIT)") ]]; then
-        message="System load limit went below $LOAD_LIMIT (Current: $(echo $systemstatus | jq -r '.load')%)"
-        alarm_check_up "load" "$message" "system"
-    else
-        message="The system load limit has exceeded $LOAD_LIMIT (Current: $(echo $systemstatus | jq -r '.load')%)"
-        alarm_check_down "load" "$message" "system"
-    fi
-
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber < $RAM_LIMIT)") ]]; then
-        message="RAM usage limit went below $RAM_LIMIT (Current: $(echo $systemstatus | jq -r '.ram')%)"
-        alarm_check_up "ram" "$message" "system"
-    else
-        message="RAM usage limit has exceeded $RAM_LIMIT (Current: $(echo $systemstatus | jq -r '.ram')%)"
-        alarm_check_down "ram" "$message" "system"
-    fi
-
 }
 
 #~ usage
