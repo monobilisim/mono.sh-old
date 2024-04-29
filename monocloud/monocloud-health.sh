@@ -17,7 +17,7 @@ if [[ "$CRON_MODE" == "1" ]]; then
 
     #~ redirect all outputs to file
     exec &>>/tmp/monocloud-health.log
-else 
+else
     color_red=$(tput setaf 1)
     color_green=$(tput setaf 2)
     color_yellow=$(tput setaf 3)
@@ -90,32 +90,41 @@ check_partitions() {
 #~ check status
 check_status() {
     printf "\n"
-    echo "Disk durumları kontrol ediliyor..."
-    diskout="$(check_partitions)"
-    if [[ -n "$diskout" && $(echo $diskout | jq -r ".[] | select(.percentage | tonumber > $PART_USE_LIMIT)") ]]; then
-        echo -e "${c_red}[ WARN ] Disk kullanımı limitini aşan bölüm bulundu. Alarm gönderilecek...${c_reset}"
-    else
-        echo -e "${c_green}[  OK  ] Disk kullanımı limitini aşan bölüm yok.${c_reset}"
-    fi
+    echo "Monocloud Health Check - $script_version - $(date)"
     printf "\n"
 
-    echo "Sistem yükü ve RAM kullanımı kontrol ediliyor..."
-    systemout="$(check_system_load_and_ram)"
+    log_header "Disk Usages"
+    info="$(check_partitions | jq -r '.[] | [.percentage, .usage, .total, .partition, .mountpoint, .note] | @tsv')"
+    oldIFS=$IFS
+    IFS=$'\n'
+    for i in ${info[@]}; do
+        IFS=$oldIFS a=($i)
+        if [[ ${a[0]} -gt $PART_USE_LIMIT ]]; then
+            print_colour "Disk Usage is ${a[3]}" "greater than $PART_USE_LIMIT (${a[0]}%)" "error"
+        else
+            print_colour "Disk Usage is ${a[3]}" "less than $PART_USE_LIMIT (${a[0]}%)"
+        fi
+    done
 
-    if [[ -n "$systemout" && $(echo $systemout | jq -r ". | select(.load | tonumber > $LOAD_LIMIT)") ]]; then
-        echo -e "${c_red}[ WARN ] Sistem yükü limiti aşıldı. Alarm gönderiliyor...${c_reset}"
-    else
-        echo -e "${c_green}[  OK  ] Sistem yükü limiti aşılmadı."
-    fi
-
-    if [[ -n "$systemout" && $(echo $systemout | jq -r ". | select(.ram | tonumber > $RAM_LIMIT)") ]]; then
-        echo -e "${c_red}[ WARN ] RAM kullanımı limiti aşıldı. Alarm gönderiliyor...${c_reset}"
-    else
-        echo -e "${c_green}[  OK  ] RAM kullanımı limiti aşılmadı.${c_reset}"
-    fi
     printf "\n"
 
-    report_status
+    log_header "System Load and RAM"
+    systemstatus="$(check_system_load_and_ram)"
+    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT)") ]]; then
+        print_colour "System Load" "greater than $LOAD_LIMIT ($(echo $systemstatus | jq -r '.load'))" "error"
+    else
+        print_colour "System Load" "less than $LOAD_LIMIT ($(echo $systemstatus | jq -r '.load'))"
+    fi
+
+    if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > $RAM_LIMIT)") ]]; then
+        print_colour "RAM Usage" "greater than $RAM_LIMIT ($(echo $systemstatus | jq -r '.ram'))" "error"
+    else
+        print_colour "RAM Usage" "less than $RAM_LIMIT ($(echo $systemstatus | jq -r '.ram'))"
+    fi
+
+    printf "\n"
+
+    report_status &>/dev/null
 }
 
 #~ check system load and ram
@@ -163,13 +172,27 @@ convertToProper() {
     echo $result
 }
 
+log_header() {
+    echo "$1"
+    echo "--------------------------------------------------"
+}
+
+print_colour() {
+    #~ $1: service name  $2: status  $3: type
+    if [ "$3" != 'error' ]; then
+        printf "  %-40s %s\n" "${color_blue}$1${color_reset}" "is ${color_green}$2${color_reset}"
+    else
+        printf "  %-40s %s\n" "${color_blue}$1${color_reset}" "is ${color_red}$2${color_reset}"
+    fi
+}
+
 report_status() {
     local diskstatus="$(check_partitions)"
     local systemstatus="$(check_system_load_and_ram)"
     [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
 
     local underthreshold_disk=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Bölüm kullanım seviyesi aşağıdaki bölümler için %$PART_USE_LIMIT seviyesinin altına indi;\n\`\`\`\n"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table+='\n'
     for z in $(seq 1 110); do table+="$(printf '-')"; done
@@ -193,13 +216,13 @@ report_status() {
         done
         message+="$table\n\`\`\`\"}"
         IFS=$oldifs
-        #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "Underthreshold için bugün gönderilecek alarm yok..."; }
-        [[ "$underthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "Underthreshold (DISK) için bugün gönderilecek alarm yok..."; }
+        #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Underthreshold today..."; }
+        [[ "$underthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
     fi
 
 
     local overthreshold_disk=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Bölüm kullanım seviyesi aşağıdaki bölümler için %$PART_USE_LIMIT seviyesinin üstüne çıktı;\n\`\`\`\n"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')\n"
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber > $PART_USE_LIMIT)")" ]]; then
@@ -227,57 +250,61 @@ report_status() {
                 overthreshold_disk=1
             fi
             table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
-        done    
+        done
         message+="$table\n\`\`\`\"}"
         IFS=$oldifs
-        #[[ "$overthreshold_disk" == "1" ]] && echo $message || { echo "Overthreshold için bugün gönderilecek alarm yok..."; }
-        [[ "$overthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "Overthreshold (DISK) için bugün gönderilecek alarm yok..."; }
+        #[[ "$overthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Overthreshold today."; }
+        [[ "$overthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Overthreshold (DISK) today..."; }
     fi
 
     local underthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Sistem yükü limiti $LOAD_LIMIT seviyesinin altına indi...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] System load limit went below $LOAD_LIMIT "
     if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber < $LOAD_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/system_load" ]]; then
             underthreshold_system=1
             rm -f /tmp/monocloud-health/system_load
+            message+="(Current: $(echo $systemstatus | jq -r '.load')%)...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         else
-            echo "Underthreshold (SYS) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Underthreshold (SYS) today..."
         fi
     fi
 
     local overthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Sistem yükü limiti $LOAD_LIMIT seviyesinin üstüne çıktı...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] The system load limit has exceeded $LOAD_LIMIT "
     if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/system_load" && "$(cat /tmp/monocloud-health/system_load)" == "$(date +%Y-%m-%d)" ]]; then
-            echo "Overthreshold (SYS) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Overthreshold (SYS) today..."
         else
             overthreshold_system=1
             date +%Y-%m-%d >/tmp/monocloud-health/system_load
+            message+="(Current: $(echo $systemstatus | jq -r '.load')%)...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         fi
     fi
 
     local underthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] RAM kullanımı limiti $RAM_LIMIT seviyesinin altına indi...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] RAM usage limit went below $RAM_LIMIT "
     if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber < $RAM_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/ram_usage" ]]; then
             underthreshold_ram=1
             rm -f /tmp/monocloud-health/ram_usage
+            message+="(Current: $(echo $systemstatus | jq -r '.ram')%)...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         else
-            echo "Underthreshold (RAM) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Underthreshold (RAM) today..."
         fi
     fi
 
     local overthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] RAM kullanımı limiti $RAM_LIMIT seviyesinin üstüne çıktı...\"}"
+    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] RAM usage limit has exceeded $RAM_LIMIT "
     if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > $RAM_LIMIT)") ]]; then
         if [[ -f "/tmp/monocloud-health/ram_usage" && "$(cat /tmp/monocloud-health/ram_usage)" == "$(date +%Y-%m-%d)" ]]; then
-            echo "Overthreshold (RAM) için bugün gönderilecek alarm yok..."
+            echo "There's no alarm for Overthreshold (RAM) today..."
         else
             overthreshold_ram=1
             date +%Y-%m-%d >/tmp/monocloud-health/ram_usage
+            message+="(Current: $(echo $systemstatus | jq -r '.ram')%)...\"}"
             curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
         fi
     fi
@@ -286,9 +313,8 @@ report_status() {
 
 #~ usage
 usage() {
-    echo -e "Usage: $0 [-c <configfile>] [-C] [-h] [-l] [-V] [-v]"
+    echo -e "Usage: $0 [-c <configfile>] [-h] [-l] [-V] [-v]"
     echo -e "\t-c | --config   <configfile> : Use custom config file. (default: $CONFIG_PATH)"
-    echo -e "\t-C | --check                 : Check system load, ram and disk."
     echo -e "\t-l | --list                  : List partition status."
     echo -e "\t-V | --validate              : Validate temporary directory and config."
     echo -e "\t-v | --version               : Print script version."
@@ -312,18 +338,17 @@ validate() {
 #~ main
 main() {
     mkdir -p /tmp/monocloud-health
-    opt=($(getopt -l "config:,check,debug,list,validate,version,help" -o "c:,C,d,l,V,v,h" -n "$0" -- "$@"))
+    opt=($(getopt -l "config:,debug,list,validate,version,help" -o "c:,d,l,V,v,h" -n "$0" -- "$@"))
     eval set -- "${opt[@]}"
     CONFIG_PATH="/etc/monocloud-health.conf"
     [[ "$1" == '-c' ]] || [[ "$1" == '--config' ]] && { [[ -n $2 ]] && CONFIG_PATH=$2; }
     [[ "$1" == '-d' ]] || [[ "$1" == '--debug' ]] && { set +x; }
     check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
-    # [[ "${#opt[@]}" == "1" ]] && { check_partitions; exit 1; }
-    while true; do
+
+        [[ "${#opt[@]}" == "1" ]] && { check_status; exit 1; }
+
+        while true; do
         case $1 in
-        -C | --check)
-            check_status
-            ;;
         -l | --list)
             check_partitions | jq
             ;;
