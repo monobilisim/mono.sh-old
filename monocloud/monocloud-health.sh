@@ -25,6 +25,7 @@ else
     color_reset=$(tput sgr0)
 fi
 
+mkdir -p /tmp/monocloud-health
 
 #~ check configuration file
 check_config_file() {
@@ -41,6 +42,140 @@ check_config_file() {
         }
     done
     return 0
+}
+
+if [ -z "$ALARM_INTERVAL" ]; then
+    ALARM_INTERVAL=3
+fi
+
+function alarm() {
+    if [ -z "$ALARM_WEBHOOK_URLS" ]; then
+        curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$WEBHOOK_URL" 1>/dev/null
+    else
+        for webhook in "${ALARM_WEBHOOK_URLS[@]}"; do
+            curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$webhook" 1>/dev/null
+        done
+    fi
+
+    if [ "$SEND_DM_ALARM" = "1" ] && [ -n "$ALARM_BOT_API_KEY" ] && [ -n "$ALARM_BOT_EMAIL" ] && [ -n "$ALARM_BOT_API_URL" ] && [ -n "$ALARM_BOT_USER_EMAILS" ]; then
+        for user_email in "${ALARM_BOT_USER_EMAILS[@]}"; do
+            curl -s -X POST "$ALARM_BOT_API_URL"/api/v1/messages \
+                -u "$ALARM_BOT_EMAIL:$ALARM_BOT_API_KEY" \
+                --data-urlencode type=direct \
+                --data-urlencode "to=$user_email" \
+                --data-urlencode "content=$1" 1>/dev/null
+        done
+    fi
+}
+
+function get_time_diff() {
+    [[ -z $1 ]] && {
+        echo "Service name is not defined"
+        return
+    }
+    service_name=$1
+    service_name=$(echo "$service_name" | sed 's#/#-#g')
+    file_path="/tmp/monocloud-health/monocloud_${service_name}_status.txt"
+
+    if [ -f "${file_path}" ]; then
+
+        old=$(date -d "$(awk '{print $1, $2}' <"${file_path}")" +%s)
+        new=$(date -d "$(date '+%Y-%m-%d %H:%M')" +%s)
+
+        time_diff=$(((new - old) / 60))
+
+        if ((time_diff >= ALARM_INTERVAL)); then
+            date "+%Y-%m-%d %H:%M" >"${file_path}"
+        fi
+    else
+        date "+%Y-%m-%d %H:%M" >"${file_path}"
+        time_diff=0
+    fi
+
+    echo $time_diff
+}
+
+function alarm_check_down() {
+    [[ -z $1 ]] && {
+        echo "Service name is not defined"
+        return
+    }
+    service_name=${1//\//-}
+    file_path="/tmp/monocloud-health/monocloud_${service_name}_status.txt"
+    [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
+
+    if [ -z $3 ]; then
+        if [ -f "${file_path}" ]; then
+            old_date=$(awk '{print $1}' <"$file_path")
+            current_date=$(date "+%Y-%m-%d")
+            if [ "${old_date}" != "${current_date}" ]; then
+                date "+%Y-%m-%d %H:%M" >"${file_path}"
+                alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+            fi
+        else
+            date "+%Y-%m-%d %H:%M" >"${file_path}"
+            alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+        fi
+    else
+        if [ -f "${file_path}" ]; then
+            old_date=$(awk '{print $1}' <"$file_path")
+            [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
+            current_date=$(date "+%Y-%m-%d")
+            if [ "${old_date}" != "${current_date}" ]; then
+                date "+%Y-%m-%d %H:%M locked" >"${file_path}"
+                alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+            else
+                if ! $locked; then
+                    time_diff=$(get_time_diff "$1")
+                    if ((time_diff >= ALARM_INTERVAL)); then
+                        date "+%Y-%m-%d %H:%M locked" >"${file_path}"
+                        alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+                        if [ $3 == "service" ]; then
+                            check_active_sessions
+                        fi
+                    fi
+                fi
+            fi
+        else
+            date "+%Y-%m-%d %H:%M" >"${file_path}"
+        fi
+    fi
+}
+
+function alarm_check_up() {
+    [[ -z $1 ]] && {
+        echo "Service name is not defined"
+        return
+    }
+    service_name=${1//\//-}
+    file_path="/tmp/monocloud-health/monocloud_${service_name}_status.txt"
+    [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
+
+    # delete_time_diff "$1"
+    if [ -f "${file_path}" ]; then
+        if [ -z $3 ]; then
+            rm -rf "${file_path}"
+            alarm "Monocloud - $alarm_hostname] [:check:] $2"
+        else
+            [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
+            rm -rf "${file_path}"
+            if $locked; then
+                alarm "Monocloud - $alarm_hostname] [:check:] $2"
+            fi
+        fi
+    fi
+}
+
+function check_active_sessions() {
+    active_sessions=($(ls /var/run/ssh-session))
+    if [[ ${#active_sessions[@]} == 0 ]]; then
+        return
+    else
+        for session in "${active_sessions[@]}"; do
+            user=$(jq -r .username /var/run/ssh-session/"$session")
+            alarm_check_down "session_$session" "User *$user* is connected to host"
+        done
+    fi
 }
 
 #~ check partitions
@@ -197,8 +332,8 @@ report_status() {
     table+='\n'
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber < $PART_USE_LIMIT)")" ]]; then
-       local oldifs=$IFS
-       IFS=$'\n'
+        local oldifs=$IFS
+        IFS=$'\n'
         for info in $(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber < $PART_USE_LIMIT) | [.percentage, .usage, .total, .partition, .mountpoint] | @tsv"); do
             IFS=$oldifs a=($info)
             percentage=${a[0]}
@@ -219,7 +354,6 @@ report_status() {
         #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Underthreshold today..."; }
         [[ "$underthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
     fi
-
 
     local overthreshold_disk=0
     message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
@@ -257,56 +391,20 @@ report_status() {
         [[ "$overthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Overthreshold (DISK) today..."; }
     fi
 
-    local underthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] System load limit went below $LOAD_LIMIT "
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber < $LOAD_LIMIT)") ]]; then
-        if [[ -f "/tmp/monocloud-health/system_load" ]]; then
-            underthreshold_system=1
-            rm -f /tmp/monocloud-health/system_load
-            message+="(Current: $(echo $systemstatus | jq -r '.load')%)...\"}"
-            curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
-        else
-            echo "There's no alarm for Underthreshold (SYS) today..."
-        fi
+    if [[ -n $(echo "$systemstatus" | jq -r ". | select(.load | tonumber < $LOAD_LIMIT)") ]]; then
+        message="System load limit went below $LOAD_LIMIT Current: $(echo "$systemstatus" | jq -r '.load')%)"
+        alarm_check_up "load" "$message" "system"
+    else
+        message="The system load limit has exceeded $LOAD_LIMIT Current: $(echo "$systemstatus" | jq -r '.load')%)"
+        alarm_check_down "load" "$message" "system"
     fi
 
-    local overthreshold_system=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] The system load limit has exceeded $LOAD_LIMIT "
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT)") ]]; then
-        if [[ -f "/tmp/monocloud-health/system_load" && "$(cat /tmp/monocloud-health/system_load)" == "$(date +%Y-%m-%d)" ]]; then
-            echo "There's no alarm for Overthreshold (SYS) today..."
-        else
-            overthreshold_system=1
-            date +%Y-%m-%d >/tmp/monocloud-health/system_load
-            message+="(Current: $(echo $systemstatus | jq -r '.load')%)...\"}"
-            curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
-        fi
-    fi
-
-    local underthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] RAM usage limit went below $RAM_LIMIT "
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber < $RAM_LIMIT)") ]]; then
-        if [[ -f "/tmp/monocloud-health/ram_usage" ]]; then
-            underthreshold_ram=1
-            rm -f /tmp/monocloud-health/ram_usage
-            message+="(Current: $(echo $systemstatus | jq -r '.ram')%)...\"}"
-            curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
-        else
-            echo "There's no alarm for Underthreshold (RAM) today..."
-        fi
-    fi
-
-    local overthreshold_ram=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] RAM usage limit has exceeded $RAM_LIMIT "
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > $RAM_LIMIT)") ]]; then
-        if [[ -f "/tmp/monocloud-health/ram_usage" && "$(cat /tmp/monocloud-health/ram_usage)" == "$(date +%Y-%m-%d)" ]]; then
-            echo "There's no alarm for Overthreshold (RAM) today..."
-        else
-            overthreshold_ram=1
-            date +%Y-%m-%d >/tmp/monocloud-health/ram_usage
-            message+="(Current: $(echo $systemstatus | jq -r '.ram')%)...\"}"
-            curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
-        fi
+    if [[ -n $(echo "$systemstatus" | jq -r ". | select(.ram | tonumber < $RAM_LIMIT)") ]]; then
+        message="RAM usage limit went below $RAM_LIMIT (Current: $(echo "$systemstatus" | jq -r '.ram')%)"
+        alarm_check_up "ram" "$message" "system"
+    else
+        message="RAM usage limit has exceeded $RAM_LIMIT (Current: $(echo "$systemstatus" | jq -r '.ram')%)"
+        alarm_check_down "ram" "$message" "system"
     fi
 
 }
@@ -345,9 +443,12 @@ main() {
     [[ "$1" == '-d' ]] || [[ "$1" == '--debug' ]] && { set +x; }
     check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
 
-        [[ "${#opt[@]}" == "1" ]] && { check_status; exit 1; }
+    [[ "${#opt[@]}" == "1" ]] && {
+        check_status
+        exit 1
+    }
 
-        while true; do
+    while true; do
         case $1 in
         -l | --list)
             check_partitions | jq
