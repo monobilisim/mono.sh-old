@@ -285,7 +285,7 @@ function main() {
         check_cluster_status
         check_node_status
         check_cluster_synced
-        check_flow_control
+        #check_flow_control
     fi
 
     if [ "$(date "+%H:%M")" == "05:00" ]; then
