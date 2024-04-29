@@ -278,7 +278,7 @@ check_system_load_and_ram() {
         alarm_check_down "load" "$message" "system"
     fi
 
-    ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
+    [[ $is_old == 0 ]] && ram_u=$(echo "$ram_usage" | awk -F  '.' '{print $1}') || ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
     if [[ $ram_u -lt $RAM_LIMIT ]]; then
         message="RAM usage limit went below $RAM_LIMIT (Current: $ram_usage%)"
         alarm_check_up "ram" "$message" "system"
