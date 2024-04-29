@@ -19,13 +19,13 @@ else
     exit 1
 fi
 
-# https://github.com/mikefarah/yq v4.40.5 sürümü ile test edilmiştir
+# https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
 if [ -z "$(command -v yq)" ]; then
     read -p "Couldn't find github.com/mikefarah/yq Want me to download and put it under /usr/local/bin? [y/n]: " yn
     case $yn in
     [Yy]*)
-        wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64
-        chmod +x /usr/local/bin/yq
+	    curl -sL $(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64') --output /usr/local/bin/yq
+	    chmod +x /usr/local/bin/yq
         ;;
     [Nn]*)
         echo "Aborted"
