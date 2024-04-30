@@ -269,10 +269,10 @@ check_system_load_and_ram() {
 
     load_u=$(echo "$load" | awk -F  '.' '{print $1}')
     if [[ $load_u -lt $LOAD_LIMIT ]]; then
-        message="System load limit went below $LOAD_LIMIT (Current: $load%)"
+        message="System load limit went below $LOAD_LIMIT (Current: $load)"
         alarm_check_up "load" "$message" "system"
     else
-        message="The system load limit has exceeded $LOAD_LIMIT (Current: $load%)"
+        message="The system load limit has exceeded $LOAD_LIMIT (Current: $load)"
         alarm_check_down "load" "$message" "system"
     fi
 
