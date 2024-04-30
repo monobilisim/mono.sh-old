@@ -1,7 +1,7 @@
 #!/bin/bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.0.0"
+script_version="v3.1.0"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -44,9 +44,7 @@ check_config_file() {
     return 0
 }
 
-if [ -z "$ALARM_INTERVAL" ]; then
-    ALARM_INTERVAL=3
-fi
+[[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
 
 function alarm() {
     if [ -z "$ALARM_WEBHOOK_URLS" ]; then
@@ -110,11 +108,11 @@ function alarm_check_down() {
             current_date=$(date "+%Y-%m-%d")
             if [ "${old_date}" != "${current_date}" ]; then
                 date "+%Y-%m-%d %H:%M" >"${file_path}"
-                alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+                alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
             fi
         else
             date "+%Y-%m-%d %H:%M" >"${file_path}"
-            alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+            alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
         fi
     else
         if [ -f "${file_path}" ]; then
@@ -123,13 +121,13 @@ function alarm_check_down() {
             current_date=$(date "+%Y-%m-%d")
             if [ "${old_date}" != "${current_date}" ]; then
                 date "+%Y-%m-%d %H:%M locked" >"${file_path}"
-                alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+                alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
             else
                 if ! $locked; then
                     time_diff=$(get_time_diff "$1")
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
-                        alarm "Monocloud - $alarm_hostname] [:red_circle:] $2"
+                        alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
                         if [ $3 == "service" ]; then
                             check_active_sessions
                         fi
@@ -155,12 +153,12 @@ function alarm_check_up() {
     if [ -f "${file_path}" ]; then
         if [ -z $3 ]; then
             rm -rf "${file_path}"
-            alarm "Monocloud - $alarm_hostname] [:check:] $2"
+            alarm "[Monocloud - $alarm_hostname] [:check:] $2"
         else
             [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
             rm -rf "${file_path}"
             if $locked; then
-                alarm "Monocloud - $alarm_hostname] [:check:] $2"
+                alarm "[Monocloud - $alarm_hostname] [:check:] $2"
             fi
         fi
     fi
