@@ -27,5 +27,5 @@ There are scripts that provide more than one convenience in this collection
 | [Mono Cloud](https://github.com/monobilisim/mono.sh/tree/main/monocloud) | Script Collection for Mono Cloud |
 | [Monodb](https://github.com/monobilisim/mono.sh/tree/main/monodb) | Script Collection for Monodb |
 | [Monofon](https://github.com/monobilisim/mono.sh/tree/main/monofon) | Scripts that simplify Monofon |
-| [ERROR](https://github.com/monobilisim/mono.sh/tree/main/monok8s) | ./monok8s/.dirinfo not defined... |
+| [MonoK8s](https://github.com/monobilisim/mono.sh/tree/main/monok8s) | Script Collection for K8s Services |
 | [Monomail](https://github.com/monobilisim/mono.sh/tree/main/monomail) | Scripts for Monomail |
