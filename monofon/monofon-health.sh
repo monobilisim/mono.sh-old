@@ -468,24 +468,22 @@ check_voice_records() {
     fi
 }
 
-# function rewrite_monofon_data() {
-#     if ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
-#         file="/tmp/monofon-health/rewrite-monofon-data-row-count.txt"
-#         if [[ -f /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php ]] && ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
-#             if [[ $(date "+%H:%M") == "01:00" ]]; then
-#                 if screen -dm php /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php $(date -d "yesterday" '+%Y-%m-%d'); then
-#                     #alarm "Monofon verilerin yeniden yazılması başlatıldı"
-#                 fi
-#             fi
-#         fi
+function rewrite_monofon_data() {
+    if ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
+        file="/tmp/monofon-health/rewrite-monofon-data-row-count.txt"
+        if [[ -f /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php ]] && ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
+            if [[ $(date "+%H:%M") == "01:00" ]]; then
+                screen -dm php /var/www/html/monofon-pano-yeni/scripts/asterniclog-manual-mysql.php "$(date -d "yesterday" '+%Y-%m-%d')"
+            fi
+        fi
 
-#         if [ -f $file ]; then
-#             row_count=$(cat $file)
-#             #alarm "Monofon verilerin yeniden yazılması tamamlandı. Satır sayısı: $row_count"
-#             rm $file
-#         fi
-#     fi
-# }
+        if [ -f $file ]; then
+            # row_count=$(cat $file)
+            #alarm "Monofon verilerin yeniden yazılması tamamlandı. Satır sayısı: $row_count"
+            rm $file
+        fi
+    fi
+}
 
 function check_data_file() {
     echo_status "Checking data.json"
@@ -549,7 +547,7 @@ function main() {
     if ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
         check_data_file
     fi
-    # rewrite_monofon_data
+    rewrite_monofon_data
 }
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
@@ -580,4 +578,3 @@ echo $$ >${pidfile}
 main
 
 rm ${pidfile}
-
