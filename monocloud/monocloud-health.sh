@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.1.0"
+script_version="v3.2.0"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -27,10 +27,18 @@ fi
 
 mkdir -p /tmp/monocloud-health
 
+grep_custom() {
+    if command -v pcregrep &>/dev/null; then
+	pcregrep $@
+    else
+	grep -P $@
+    fi
+}
+
 #~ check configuration file
 check_config_file() {
     [[ ! -f "$@" ]] && {
-        echo "File \"$@\" does not exists, exiting..."
+        echo "File \"$@\" does not exist, exiting..."
         exit 1
     }
     . "$@"
@@ -77,8 +85,9 @@ function get_time_diff() {
 
     if [ -f "${file_path}" ]; then
 
-        old=$(date -d "$(awk '{print $1, $2}' <"${file_path}")" +%s)
-        new=$(date -d "$(date '+%Y-%m-%d %H:%M')" +%s)
+	old_date=$(awk '{print $1, $2}' <"${file_path}")
+	old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
+	new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
 
         time_diff=$(((new - old) / 60))
 
@@ -178,7 +187,7 @@ function check_active_sessions() {
 
 #~ check partitions
 check_partitions() {
-    local partitions="$(df -l --output='source,fstype,target' | sed '1d' | sort | uniq | grep -E $(echo ${FILESYSTEMS[@]} | sed 's/ /|/g') | awk '$2 != "zfs" {print} $2 == "zfs" && $1 !~ /\//')"
+    local partitions="$(df -l -T | awk '{print $1,$2,$7}' | sed '1d' | sort | uniq | grep -E $(echo ${FILESYSTEMS[@]} | sed 's/ /|/g') | awk '$2 != "zfs" {print} $2 == "zfs" && $1 !~ /\//')"
     oldIFS=$IFS
     local json="["
     IFS=$'\n'
@@ -188,27 +197,32 @@ check_partitions() {
         local filesystem="${info[1]}"
         local mountpoint="${info[2]}"
         if [[ "${FILESYSTEMS[@]}" =~ "$filesystem" ]]; then
-            if [[ "$filesystem" == "fuse.zfs" ]]; then
-                note="Fuse ZFS is not supported yet."
-                usage="0"
-                avail="0"
-                total="0"
-                percentage="0"
-            elif [[ "$filesystem" == "zfs" ]]; then
-                usage=$(zfs list -H -p -o used "$partition")
-                avail=$(zfs list -H -p -o avail "$partition")
-                total=$((usage + avail))
-                percentage=$((usage * 100 / total))
-            elif [[ "$filesystem" == "btrfs" ]]; then
-                usage=$(btrfs fi us -b $mountpoint | grep -P '^\s.+Used' | awk '{print $2}')
-                total=$(btrfs fi us -b $mountpoint | grep -P 'Device size' | awk '{print $3}')
-                percentage=$(echo "scale=2; $usage / $total * 100" | bc)
-            else
-                stat=($(df -B1 --output="used,size,pcent" $mountpoint | sed '1d'))
-                usage=${stat[0]}
-                total=${stat[1]}
-                percentage=${stat[2]}
-            fi
+            case $filesystem in
+		"fuze.zfs")
+		    note="Fuse ZFS is not supported yet."
+		    usage="0"
+		    avail="0"
+		    total="0"
+		    percentage="0"
+		    ;;
+		"zfs")
+		    usage=$(zfs list -H -p -o used "$partition")
+		    avail=$(zfs list -H -p -o avail "$partition")
+		    total=$((usage + avail))
+		    percentage=$((usage * 100 / total))
+		    ;;
+		"btrfs")
+		    usage=$(btrfs fi us -b $mountpoint | grep_custom '^\s.+Used' | awk '{print $2}')
+		    total=$(btrfs fi us -b $mountpoint | grep_custom 'Device size' | awk '{print $3}')
+		    percentage=$(echo "scale=2; $usage / $total * 100" | bc)
+		    ;;
+		*)
+		    stat=($(df -P / | sed '1d' | awk '{printf "%s %-12s   %s\n", $3*1024, $2*1024, $5}'))
+		    usage=${stat[0]}
+		    total=${stat[1]}
+		    percentage=${stat[2]}
+		    ;;
+	    esac
         fi
         [[ "$usage" != "0" ]] && usage=$(convertToProper $usage)
         [[ "$total" != "0" ]] && total=$(convertToProper $total)
@@ -260,11 +274,36 @@ check_status() {
     report_status &>/dev/null
 }
 
+freebsd_mib() {
+	if [[ "$1" == "vmstat" ]]; then
+	    local bytes="$(echo "$(vmstat_jq "$2") * 1024" | bc)"
+	else
+	    local bytes="$(sysctl -n $1)"
+	fi
+	local mib=$(echo "($bytes + 524288) / 1048576" | bc)  # Round to the nearest MiB
+	echo "$mib"
+}
+
+free_custom() {
+    
+    if command -v free &>/dev/null; then
+		free -m "$@"
+		return $?
+    fi
+
+    # Mem: Total, Used, Free, Shared, Buff/Cache, Available
+    total="$(freebsd_mib hw.physmem)" # Correct
+    used="$(echo "$total - $(freebsd_mib hw.usermem)" | bc)"
+
+    echo "Mem: $total $used" # Rest we dont need for now
+}
+
 #~ check system load and ram
 check_system_load_and_ram() {
     [[ -z "$(command -v systemctl)" ]] && is_old=1 || is_old=0
-    load=$(uptime | awk -F'average:' '{print $2}' | awk -F',' '{print $1}' | xargs)
-    [[ $is_old == 0 ]] && ram_usage=$(free -m | awk '/Mem/{printf("%.2f", $3/$2*100)}') || ram_usage=$(free -m | awk '/Mem/{printf("%.2f", ($3-$6-$7)/$2*100)}')
+    [[ -z "$(command -v pkg)" ]] && average="average:" || average="averages:" # its 'averages:' instead of 'average:' on freebsd
+    load=$(uptime | awk -F"$average" '{print $2}' | awk -F',' '{print $1}' | xargs)
+    [[ $is_old == 0 ]] && ram_usage=$(free_custom | awk '/Mem/{printf("%.2f", $3/$2*100)}') || ram_usage=$(free_custom | awk '/Mem/{printf("%.2f", ($3-$6-$7)/$2*100)}')
     local json="{\"load\":\"$load\",\"ram\":\"$ram_usage\"}"
 
     load_u=$(echo "$load" | awk -F  '.' '{print $1}')
@@ -276,7 +315,12 @@ check_system_load_and_ram() {
         alarm_check_down "load" "$message" "system"
     fi
 
-    [[ $is_old == 0 ]] && ram_u=$(echo "$ram_usage" | awk -F  '.' '{print $1}') || ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
+    ram_u=$(echo "$ram_usage" | awk -F  '.' '{print $1}') 
+    
+    if [[ "$ram_u" == "$ram_usage" ]]; then
+	ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
+    fi
+
     if [[ $ram_u -lt $RAM_LIMIT ]]; then
         message="RAM usage limit went below $RAM_LIMIT (Current: $ram_usage%)"
         alarm_check_up "ram" "$message" "system"
@@ -427,7 +471,7 @@ validate() {
         [[ ! -e "$(command -v $a)" ]] && missing_apps+="$a, "
     done
     [[ -n "$missing_apps" ]] && { echo -e "${c_red}[ FAIL ] Please install this apps before proceeding: (${missing_apps%, })"; } || { echo -e "${c_green}[  OK  ] Required apps are already installed."; }
-    curl -fsSL $(echo $WEBHOOK_URL | grep -Po '(?<=\:\/\/)(([a-z]|\.)+)') &>/dev/null
+    curl -fsSL $(echo $WEBHOOK_URL | grep_custom -o '(?<=\:\/\/)(([a-z]|\.)+)') &>/dev/null
     [[ ! "$?" -eq "0" ]] && { echo -e "${c_red}[ FAIL ] Webhook URL is not reachable."; } || { echo -e "${c_green}[  OK  ] Webhook URL is reachable."; }
     touch /tmp/monocloud-health/.testing
     [[ ! "$?" -eq "0" ]] && { echo -e "${c_red}[ FAIL ] /tmp/monocloud-health is not writable."; } || { echo -e "${c_green}[  OK  ] /tmp/monocloud-health is writable."; }
@@ -436,42 +480,62 @@ validate() {
 #~ main
 main() {
     mkdir -p /tmp/monocloud-health
-    opt=($(getopt -l "config:,debug,list,validate,version,help" -o "c:,d,l,V,v,h" -n "$0" -- "$@"))
-    eval set -- "${opt[@]}"
+    
     CONFIG_PATH="/etc/monocloud-health.conf"
-    [[ "$1" == '-c' ]] || [[ "$1" == '--config' ]] && { [[ -n $2 ]] && CONFIG_PATH=$2; }
-    [[ "$1" == '-d' ]] || [[ "$1" == '--debug' ]] && { set +x; }
-    check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
+    
+    if [ "$1" == "--debug" ] || [ "$1" == "-d" ]; then
+		set -x
+		shift
+    fi
 
-    [[ "${#opt[@]}" == "1" ]] && {
-        check_status
-        exit 1
+    if [[ "$1" == "--config="* ]] || [[ "$1" == "-c="* ]]; then
+	local config_path_tmp="${1#*=}"
+	local config_path_tmp="${config_path_tmp:-false}"
+	shift
+    elif [[ ( "$1" == "--config" || "$1" == "-c" ) && ! "$2" =~ ^- ]]; then	
+	local config_path_tmp="${2:-false}"
+	shift 2
+    fi
+
+    if [[ "$config_path_tmp" == "false" ]]; then
+	echo "$0: option requires an argument -- 'config/-c'"
+	shift
+    elif [[ -n "$config_path_tmp" ]]; then
+	CONFIG_PATH="$config_path_tmp"
+    fi
+
+    check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
+   
+    [[ $# -eq 0 ]] && {
+	check_status
+	exit 1
     }
 
-    while true; do
-        case $1 in
-        -l | --list)
-            check_partitions | jq
+    while [[ $# -gt 0 ]]; do
+	case $1 in
+	    -l | --list)
+		check_partitions | jq
+	    ;;  
+	    -V | --validate)
+		validate
             ;;
-        -V | --validate)
-            validate
+	    -v | --version)
+		echo "Script Version: $script_version"
             ;;
-        -v | --version)
-            echo "Script Version: $script_version"
+	    --)
+		shift
+		return 0
             ;;
-        --)
-            shift
-            return 0
+	    -h | --help)
+		usage
+		break
             ;;
-        -h | --help)
-            usage
-            break
-            ;;
-        esac
+	esac
         _status="$?"
         [[ "${_status}" != "0" ]] && { exit ${_status}; }
-        shift
+	shift
     done
+
 }
 
 main "$@"
