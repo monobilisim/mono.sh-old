@@ -198,7 +198,7 @@ check_partitions() {
         local mountpoint="${info[2]}"
         if [[ "${FILESYSTEMS[@]}" =~ "$filesystem" ]]; then
             case $filesystem in
-		"fuze.zfs")
+		"fuse.zfs")
 		    note="Fuse ZFS is not supported yet."
 		    usage="0"
 		    avail="0"
