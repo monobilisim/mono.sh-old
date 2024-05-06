@@ -558,11 +558,11 @@ main() {
     elif [[ -n "$config_path_tmp" ]]; then
 	CONFIG_PATH="$config_path_tmp"
     fi
-
-    [[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
-    [[ -z "$DYNAMIC_LIMIT_INTERVAL" ]] && DYNAMIC_LIMIT_INTERVAL=100
     
     check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
+    
+    [[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
+    [[ -z "$DYNAMIC_LIMIT_INTERVAL" ]] && DYNAMIC_LIMIT_INTERVAL=100
 
     dynamic_limit
 
