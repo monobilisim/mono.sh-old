@@ -52,8 +52,6 @@ check_config_file() {
     return 0
 }
 
-[[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
-
 function alarm() {
     if [ -z "$ALARM_WEBHOOK_URLS" ]; then
         curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$WEBHOOK_URL" 1>/dev/null
@@ -234,6 +232,56 @@ check_partitions() {
     echo $json
 }
 
+function sum_array() {
+	local sum=0
+	for num in $@; do
+		sum=$(echo "$sum + $num" | bc)
+	done
+	echo $sum
+}
+
+function dynamic_limit() {
+    [[ "$DYNAMIC_LIMIT_INTERVAL" -lt 1 ]] && return
+    
+    [ -d "/tmp/monocloud-health/checks" ] || return
+    cd /tmp/monocloud-health/checks
+    
+    LOAD_LIMIT_ARRAY=()
+    RAM_LIMIT_ARRAY=()
+    
+    if [ -f "/tmp/monocloud-health/checks/last_ram_limit_dynamic" ]; then
+	export RAM_LIMIT_DYNAMIC="$(cat /tmp/monocloud-health/checks/last_ram_limit_dynamic)"
+    fi
+
+    if [ -f "/tmp/monocloud-health/checks/last_load_limit_dynamic" ]; then
+	export LOAD_LIMIT_DYNAMIC="$(cat /tmp/monocloud-health/checks/last_load_limit_dynamic)"
+    fi
+
+    if [[ $(ls -1 *.json | wc -l) -ge $DYNAMIC_LIMIT_INTERVAL ]]; then
+       for file in *.json; do
+           LOAD_LIMIT_ARRAY+=( $(jq -r '.load' $file) )
+           RAM_LIMIT_ARRAY+=( $(jq -r '.ram' $file) )
+       done
+	
+       # Get the average of the array
+       export LOAD_LIMIT_DYNAMIC=$(echo "scale=2; ($(sum_array ${LOAD_LIMIT_ARRAY[@]}) / ${#LOAD_LIMIT_ARRAY[@]})" | bc)
+       if [[ "${LOAD_LIMIT_DYNAMIC:0:1}" == "." ]]; then
+	    export LOAD_LIMIT_DYNAMIC="0${LOAD_LIMIT_DYNAMIC}"
+       fi
+       export RAM_LIMIT_DYNAMIC=$(echo "scale=2; ($(sum_array ${RAM_LIMIT_ARRAY[@]}) / ${#RAM_LIMIT_ARRAY[@]})" | bc)  
+
+       rm -f /tmp/monocloud-health/checks/*
+       
+       echo "$RAM_LIMIT_DYNAMIC" > /tmp/monocloud-health/checks/last_ram_limit_dynamic
+       echo "$LOAD_LIMIT_DYNAMIC" > /tmp/monocloud-health/checks/last_load_limit_dynamic
+    fi
+    
+    [ -z "$RAM_LIMIT_DYNAMIC" ] && export RAM_LIMIT_DYNAMIC=$RAM_LIMIT
+    [ -z "$LOAD_LIMIT_DYNAMIC" ] && export LOAD_LIMIT_DYNAMIC=$LOAD_LIMIT
+
+    cd - &>/dev/null
+}
+
 #~ check status
 check_status() {
     printf "\n"
@@ -257,16 +305,17 @@ check_status() {
 
     log_header "System Load and RAM"
     systemstatus="$(check_system_load_and_ram)"
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT)") ]]; then
-        print_colour "System Load" "greater than $LOAD_LIMIT ($(echo $systemstatus | jq -r '.load'))" "error"
+    
+    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT})") ]]; then
+        print_colour "System Load" "greater than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))" "error"
     else
-        print_colour "System Load" "less than $LOAD_LIMIT ($(echo $systemstatus | jq -r '.load'))"
+        print_colour "System Load" "less than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))"
     fi
 
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > $RAM_LIMIT)") ]]; then
-        print_colour "RAM Usage" "greater than $RAM_LIMIT ($(echo $systemstatus | jq -r '.ram'))" "error"
+    if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT})") ]]; then
+        print_colour "RAM Usage" "greater than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))" "error"
     else
-        print_colour "RAM Usage" "less than $RAM_LIMIT ($(echo $systemstatus | jq -r '.ram'))"
+        print_colour "RAM Usage" "less than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))"
     fi
 
     printf "\n"
@@ -307,11 +356,12 @@ check_system_load_and_ram() {
     local json="{\"load\":\"$load\",\"ram\":\"$ram_usage\"}"
 
     load_u=$(echo "$load" | awk -F  '.' '{print $1}')
-    if [[ $load_u -lt $LOAD_LIMIT ]]; then
-        message="System load limit went below $LOAD_LIMIT (Current: $load)"
+     
+    if (( $(echo "$load_u < ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT}" | bc -l) )); then
+        message="System load limit went below ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} (Current: $load)"
         alarm_check_up "load" "$message" "system"
     else
-        message="The system load limit has exceeded $LOAD_LIMIT (Current: $load)"
+        message="The system load limit has exceeded ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} (Current: $load)"
         alarm_check_down "load" "$message" "system"
     fi
 
@@ -320,14 +370,19 @@ check_system_load_and_ram() {
     if [[ "$ram_u" == "$ram_usage" ]]; then
 	ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
     fi
+    
 
-    if [[ $ram_u -lt $RAM_LIMIT ]]; then
-        message="RAM usage limit went below $RAM_LIMIT (Current: $ram_usage%)"
+
+    if (( $(echo "$load_u < ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT}" | bc -l) )); then
+        message="RAM usage limit went below ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} (Current: $ram_usage%)"
         alarm_check_up "ram" "$message" "system"
     else
-        message="RAM usage limit has exceeded $RAM_LIMIT (Current: $ram_usage%)"
+        message="RAM usage limit has exceeded ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} (Current: $ram_usage%)"
         alarm_check_down "ram" "$message" "system"
     fi
+
+    [ ! -d "/tmp/monocloud-health/checks" ] && mkdir -p /tmp/monocloud-health/checks
+    echo $json > /tmp/monocloud-health/checks/$(date +%s).json
 
     echo $json
 }
@@ -504,8 +559,13 @@ main() {
 	CONFIG_PATH="$config_path_tmp"
     fi
 
+    [[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
+    [[ -z "$DYNAMIC_LIMIT_INTERVAL" ]] && DYNAMIC_LIMIT_INTERVAL=100
+    
     check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
-   
+
+    dynamic_limit
+
     [[ $# -eq 0 ]] && {
 	check_status
 	exit 1
