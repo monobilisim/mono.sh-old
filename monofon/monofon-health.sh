@@ -267,32 +267,6 @@ function check_trunks() {
     IFS=$OLDIFS
 }
 
-function check_system_load_and_ram() {
-    echo_status "Checking system load and RAM usage"
-    load=$(uptime | awk -F'[a-z]:' '{ print $2 }' | awk '{print $1}' | cut -d',' -f1)
-    if [ $is_old == 0 ]; then
-        ram_usage=$(free -m | awk '/Mem/{printf("%.2f", $3/$2*100)}')
-    else
-        ram_usage=$(free -m | awk '/Mem/{printf("%.2f", ($3-$6-$7)/$2*100)}')
-    fi
-
-    if [ "$(echo "$load" | cut -d'.' -f1)" -gt "$LOAD_LIMIT" ]; then
-        print_colour "System load" "greater than $LOAD_LIMIT" "error"
-        alarm_check_down "sys_load" "System load at $IDENTIFIER is greater than $LOAD_LIMIT Load: $load"
-    else
-        print_colour "System load" "$load"
-        alarm_check_up "sys_load" "System load at $IDENTIFIER returned to normal. Load: $load"
-    fi
-
-    if [ "$(echo "$ram_usage > $RAM_LIMIT" | bc)" -eq 1 ]; then
-        print_colour "RAM usage" "above $RAM_LIMIT%" "error"
-        alarm_check_down "ram_usage" "RAM usage at $IDENTIFIER is above $RAM_LIMIT% RAM usage: $ram_usage"
-    else
-        print_colour "RAM usage" "$ram_usage%"
-        alarm_check_up "ram_usage" "RAM usage at $IDENTIFIER returned to normal. RAM usage: $ram_usage"
-    fi
-}
-
 function get_time_diff() {
     [[ -z $1 ]] && {
         echo "Service name is not defined"
@@ -528,8 +502,6 @@ function main() {
     if ! containsElement "monofon" "${IGNORED_SERVICES[@]}"; then
         check_monofon_services
     fi
-    printf '\n'
-    check_system_load_and_ram
     printf '\n'
     check_concurrent_calls
     printf '\n'
