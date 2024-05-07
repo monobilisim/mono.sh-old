@@ -162,6 +162,16 @@ function check_rke2_ingress_nginx() {
     else
 	print_colour "$(basename $INGRESS_NGINX_YAML)" "doesn't exist"
     fi
+    # Test floating IPs using curl
+    for floating_ip in "${INGRESS_FLOATING_IPS[@]}"; do
+        response=$(curl -o /dev/null -s -w "%{http_code}" "http://$floating_ip")
+        if [ "$response" == "404" ]; then
+            print_colour "Floating IP" "$floating_ip is accessible and returned HTTP 404"
+        else
+            print_colour "Floating IP" "$floating_ip is not accessible or returned HTTP $response"
+            alarm "[K8s - $IDENTIFIER] [:red_circle:] Floating IP '$floating_ip' returned unexpected response HTTP $response"
+        fi
+    done
 }
 
 function check_certmanager() {
