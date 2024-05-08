@@ -115,11 +115,11 @@ function alarm_check_down() {
             current_date=$(date "+%Y-%m-%d")
             if [ "${old_date}" != "${current_date}" ]; then
                 date "+%Y-%m-%d %H:%M" >"${file_path}"
-                alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
+                alarm "[Mono Cloud - $alarm_hostname] [:red_circle:] $2"
             fi
         else
             date "+%Y-%m-%d %H:%M" >"${file_path}"
-            alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
+            alarm "[Mono Cloud - $alarm_hostname] [:red_circle:] $2"
         fi
     else
         if [ -f "${file_path}" ]; then
@@ -128,13 +128,13 @@ function alarm_check_down() {
             current_date=$(date "+%Y-%m-%d")
             if [ "${old_date}" != "${current_date}" ]; then
                 date "+%Y-%m-%d %H:%M locked" >"${file_path}"
-                alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
+                alarm "[Mono Cloud - $alarm_hostname] [:red_circle:] $2"
             else
                 if ! $locked; then
                     time_diff=$(get_time_diff "$1")
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
-                        alarm "[Monocloud - $alarm_hostname] [:red_circle:] $2"
+                        alarm "[Mono Cloud - $alarm_hostname] [:red_circle:] $2"
                         if [ $3 == "service" ]; then
                             check_active_sessions
                         fi
@@ -160,12 +160,12 @@ function alarm_check_up() {
     if [ -f "${file_path}" ]; then
         if [ -z $3 ]; then
             rm -rf "${file_path}"
-            alarm "[Monocloud - $alarm_hostname] [:check:] $2"
+            alarm "[Mono Cloud - $alarm_hostname] [:check:] $2"
         else
             [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
             rm -rf "${file_path}"
             if $locked; then
-                alarm "[Monocloud - $alarm_hostname] [:check:] $2"
+                alarm "[Mono Cloud - $alarm_hostname] [:check:] $2"
             fi
         fi
     fi
@@ -285,7 +285,7 @@ function dynamic_limit() {
 #~ check status
 check_status() {
     printf "\n"
-    echo "Monocloud Health Check - $script_version - $(date)"
+    echo "Mono Cloud Health Check - $script_version - $(date)"
     printf "\n"
 
     log_header "Disk Usages"
@@ -444,7 +444,7 @@ report_status() {
 
     local underthreshold_disk=0
     local REDMINE_CLOSE=1
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    message="{\"text\": \"[Mono Cloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table+='\n'
     for z in $(seq 1 110); do table+="$(printf '-')"; done
@@ -484,7 +484,7 @@ report_status() {
     fi
 
     local overthreshold_disk=0
-    message="{\"text\": \"[Monocloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    message="{\"text\": \"[Mono Cloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')\n"
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber > $PART_USE_LIMIT)")" ]]; then
