@@ -523,7 +523,7 @@ report_status() {
 	    
 	    if [ "${REDMINE_ENABLE:-1}" == "1" ]; then
 		if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]  then
-		    curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"${SERVER_NICK%%-*}\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT}'i aştı\", \"description\": \"\`\`\`\n$table\n\`\`\`\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
+		    curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"${SERVER_NICK%%-*}\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} seviyesinin üstüne çıktı\", \"description\": \"\`\`\`\n$table\n\`\`\`\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
 		    jq -r '.issue.id' /tmp/monocloud-health/redmine.json > /tmp/monocloud-health/redmine_issue_id
 		    rm -f /tmp/monocloud-health/redmine.json
 		else
