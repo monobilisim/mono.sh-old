@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.2.0"
+script_version="v3.3.0"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -42,7 +42,7 @@ check_config_file() {
         exit 1
     }
     . "$@"
-    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT WEBHOOK_URL)
+    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT WEBHOOK_URL REDMINE_URL REDMINE_API_KEY)
     for var in "${required_vars[@]}"; do
         [[ -z "${!var}" ]] && {
             echo "Variable \"$var\" is not set in \"$@\". exiting..."
@@ -443,6 +443,7 @@ report_status() {
     [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
 
     local underthreshold_disk=0
+    local REDMINE_CLOSE=1
     message="{\"text\": \"[Monocloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table+='\n'
@@ -464,11 +465,22 @@ report_status() {
                 underthreshold_disk=1
                 rm -f /tmp/monocloud-health/${mountpoint//\//_}
             }
+	    if [[ -f "/tmp/monocloud-health/redmine_issue_id" && $percentage -ge $((PART_USE_LIMIT - ${REDMINE_ISSUE_DELETE_THRESHOLD:-5})) ]]; then
+		REDMINE_CLOSE=0
+	    fi
         done
         message+="$table\n\`\`\`\"}"
         IFS=$oldifs
         #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Underthreshold today..."; }
-        [[ "$underthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
+        if [[ "$underthreshold_disk" == "1" ]]; then
+	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
+	    if [[ "${REDMINE_ENABLE:-1}" == "1" && -f "/tmp/monocloud-health/redmine_issue_id" && "$REDMINE_CLOSE" == "1" ]]; then
+		# Delete issue
+		#curl -fsSL -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+		curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Threshold %$percentage altına geri indi, iş kapatıldı\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+		rm -f /tmp/monocloud-health/redmine_issue_id
+	    fi
+	fi
     fi
 
     local overthreshold_disk=0
@@ -499,12 +511,28 @@ report_status() {
                 date +%Y-%m-%d >/tmp/monocloud-health/${mountpoint//\//_}
                 overthreshold_disk=1
             fi
+
+
+
             table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
         done
         message+="$table\n\`\`\`\"}"
         IFS=$oldifs
-        #[[ "$overthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Overthreshold today."; }
-        [[ "$overthreshold_disk" == "1" ]] && curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Overthreshold (DISK) today..."; }
+        if [[ "$overthreshold_disk" == "1" ]]; then
+	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
+	    
+	    if [ "${REDMINE_ENABLE:-1}" == "1" ]; then
+		if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]  then
+		    curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"${SERVER_NICK%%-*}\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} seviyesinin üstüne çıktı\", \"description\": \"\`\`\`\n$table\n\`\`\`\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
+		    jq -r '.issue.id' /tmp/monocloud-health/redmine.json > /tmp/monocloud-health/redmine_issue_id
+		    rm -f /tmp/monocloud-health/redmine.json
+		else
+		    curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"\`\`\`\n$table\n\`\`\`\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+		fi
+	    fi
+	else
+	    echo "There's no alarm for Overthreshold (DISK) today..."
+	fi
     fi
 }
 
