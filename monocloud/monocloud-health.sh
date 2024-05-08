@@ -215,7 +215,7 @@ check_partitions() {
 		    percentage=$(echo "scale=2; $usage / $total * 100" | bc)
 		    ;;
 		*)
-		    stat=($(df -P / | sed '1d' | awk '{printf "%s %-12s   %s\n", $3*1024, $2*1024, $5}'))
+		    stat=($(df -P $mountpoint | sed '1d' | awk '{printf "%s %-12s   %s\n", $3*1024, $2*1024, $5}'))
 		    usage=${stat[0]}
 		    total=${stat[1]}
 		    percentage=${stat[2]}
