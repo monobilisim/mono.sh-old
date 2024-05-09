@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Check the health of the mono-k8s cluster
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 RED_FG=$(tput setaf 1)
 GREEN_FG=$(tput setaf 2)
@@ -85,6 +85,167 @@ function alarm() {
       fi
 }
 
+# cat /tmp/monok8s-health/monok8s_exampledeployment-example_example_status.txt
+# DATE=2021-09-29 14:00 
+# locked=true
+# STATUS=Running
+# DEPLOYMENT=exampledeployment
+
+# add_status "file_path" "status"
+add_status() {
+    if [ -f "$1" ]; then
+	sed -i '/^STATUS=/d' "$1" || true 2> /dev/null
+    fi
+    echo "STATUS='$2'" >>"$1"
+}
+
+# add_deployment "file_path" "pod_name" "namespace"
+add_deployment() {
+    deployment="$(echo "$2" | sed 's/\(.*\)-[^-]*-[^-]*$/\1/')"
+
+    if ! kubectl get deployment "$deployment" -n "$3" &> /dev/null; then
+	return
+    fi
+
+    if [ -f "$1" ]; then
+	sed -i '/^DEPLOYMENT=/d' "$1" || true 2> /dev/null
+    fi
+    echo "DEPLOYMENT='$2'" >>"$1"
+}
+
+# add_date "file_path" "locked"
+add_date() {
+    if [ -f "$1" ]; then
+	sed -i '/^DATE=/d' "$1" || true 2> /dev/null
+	sed -i '/^locked=/d' "$1" || true 2> /dev/null
+    fi
+
+    if [ "$2" == "locked" ]; then
+	echo "locked=true" >>"$1"
+    else
+	echo "locked=false" >>"$1"
+    fi
+    
+    echo "DATE='$(date "+%Y-%m-%d %H:%M")'" >>"$1"
+}
+
+function get_time_diff() {
+	file_path="$1"
+	if [ -f "${file_path}" ]; then
+	    . "${file_path}"
+	    
+	    old_date=$(echo "$DATE" | awk '{print $1, $2}')
+
+            if [ "$(uname -s | tr '[:upper:]' '[:lower:]')" == "freebsd" ]; then
+                old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
+                new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
+            else
+                old=$(date -d "$old_date" "+%s")
+                new=$(date "+%s")
+            fi
+   
+            time_diff=$(((new - old) / 60))
+   
+            if ((time_diff >= ALARM_INTERVAL)); then
+		add_date "${file_path}"
+            fi
+       else
+	   add_date "${file_path}"
+           time_diff=0
+       fi
+  
+       echo $time_diff
+   }
+
+
+function alarm_k8s() {
+    case $1 in
+	"worker")
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Worker node '$2' is not Ready, has status '$3'"
+	;;
+	"master")
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Master node '$2' is not Ready, has status '$3'"
+	;;
+	"pod")
+	    # so the deployment is up-to-date
+	    add_deployment "${file_path}" "$2" "$3"
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Pod '$2' from namespace '$3' has status '$4'"
+	;;
+	"cert")
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Certificate '$2' from namespace '$3' is not Ready"
+	;;
+	"cert_cluster")
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Cluster API cert has expired"
+	;;
+	"floating_unexpected")
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Floating IP '$2' returned unexpected response HTTP $3"
+	;;
+	"floating_noresponse")
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Floating IP '$2' is not responding"
+	;;
+    esac
+}
+
+function alarm_check_down() {
+    [[ -z $1 ]] && {
+        echo "Service type is not defined"
+        return
+    }
+    
+    file_path="/tmp/monok8s-health/monok8s_$1_$2_status.txt"
+    
+    if [[ -n "$4" ]]; then 
+	file_path="/tmp/monok8s-health/monok8s_$1_$2_$3_status.txt"
+	add_status "${file_path}" "$4"
+    elif [[ -n "$3" ]]; then
+	add_status "${file_path}" "$3"
+    else
+	add_status "${file_path}" "down"
+    fi
+
+    if [ -f "${file_path}" ]; then
+	. "${file_path}"
+	old_date=$(echo "$DATE" | awk '{print $1}')
+        current_date=$(date "+%Y-%m-%d")
+        if [ "${old_date}" != "${current_date}" ]; then
+	    add_date "${file_path}" "locked"
+	    alarm_k8s "$1" "$2" "$3" "$4"
+        else
+            if [[ $locked == false ]]; then
+                time_diff=$(get_time_diff "${file_path}")
+                if ((time_diff >= ALARM_INTERVAL)); then
+		    add_date "${file_path}" "locked"
+		    alarm_k8s "$1" "$2" "$3" "$4"
+                fi
+            fi
+        fi
+    else
+	add_date "${file_path}"
+    fi
+}
+
+alarm_check_up() {
+    file_path="/tmp/monok8s-health/monok8s_$1_$2_status.txt"
+    
+    if [[ -n "$4" ]]; then 
+	file_path="/tmp/monok8s-health/monok8s_$1_$2_$3_status.txt"
+    fi
+
+    if [ -f "${file_path}" ]; then
+	
+	. "${file_path}"
+
+	old_time=$(date -d"$DATE" "+%s")
+	current_time=$(date "+%s")
+	
+	if [[ "$STATUS" != "Running" && "((old_time + 5))" -le "$current_time" ]]; then
+	    add_date "${file_path}"
+	    add_status "${file_path}" "$4"
+	    alarm "[K8s - $IDENTIFIER] [:green_circle:] Pod '$2' from namespace '$3' is now status '$4'"
+	fi
+    fi
+}
+
 function check_master() {
     echo_status "Master Node(s):"
     while IFS= read -r master; do
@@ -94,7 +255,7 @@ function check_master() {
 	print_colour "$NAME" "$STATUS"
 	
 	if [ "$STATUS" != "Ready" ]; then	
-	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Master node '$NAME' is not Ready, has status '$STATUS'"
+	    alarm_check_down "master" "$NAME" "$STATUS"
 	fi
     
     done < <(kubectl get nodes --no-headers | grep master)
@@ -109,11 +270,12 @@ function check_workers() {
 	print_colour "$NAME" "$STATUS"
 	
 	if [ "$STATUS" != "Ready" ]; then
-	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Worker node '$NAME' is not Ready, has status '$STATUS'"
+	    alarm_check_down "worker" "$NAME" "$STATUS"
 	fi
     
     done < <(kubectl get nodes --no-headers | grep -v master)
 }
+
 
 function check_pods() {
     echo_status "Pods:"
@@ -125,7 +287,10 @@ function check_pods() {
 	case $STATUS in
 	    "CrashLoopBackOff" | "ImagePullBackOff" | "Error")
 		print_colour "$NAMESPACE"/"$NAME" "$STATUS"
-		alarm "[K8s - $IDENTIFIER] [:red_circle:] Pod '$NAME' from namespace '$NAMESPACE' has status '$STATUS'"
+		alarm_check_down "pod" "$NAME" "$NAMESPACE" "$STATUS"
+	    ;;
+	    "Running")
+		alarm_check_up "pod" "$NAME" "$NAMESPACE" "$STATUS"
 	    ;;
 	esac
     
@@ -169,7 +334,7 @@ function check_rke2_ingress_nginx() {
             print_colour "Floating IP" "$floating_ip is accessible and returned HTTP 404"
         else
             print_colour "Floating IP" "$floating_ip is not accessible or returned HTTP $response"
-            alarm "[K8s - $IDENTIFIER] [:red_circle:] Floating IP '$floating_ip' returned unexpected response HTTP $response"
+	    alarm_check_down "floating_unexpected" "$floating_ip" "$response"
         fi
     done
 }
@@ -185,7 +350,7 @@ function check_certmanager() {
 	    
 	    if [ "$READY" != "True" ]; then
 		print_colour "$NAMESPACE"/"$NAME" "not ready"
-		alarm "[K8s - $IDENTIFIER] [:red_circle:] Certificate '$NAME' from namespace '$NAMESPACE' is not Ready"
+		alarm_check_down "cert" "$NAME" "$NAMESPACE"
 	    fi
 	done < <(kubectl get certificates --all-namespaces --no-headers 2> /dev/null)
     else
@@ -200,7 +365,7 @@ function check_kube_vip() {
 	for floating in "${K8S_FLOATING_IPS[@]}"; do
 	    if ping -w 10 -c 1 "$floating" &> /dev/null; then
 		print_colour "Floating IP" "$floating doesn't respond"
-		alarm "[K8s - $IDENTIFIER] [:red_circle:] Floating IP '$floating' is not responding"
+		alarm_check_down "floating_noresponse" "$floating"
 	    fi
 	done
     else
@@ -226,13 +391,14 @@ function check_cluster_api_cert() {
 
     if [ $days_to_expiry -lt 1 ]; then
 	print_colour "Cluster API Cert" "expired"
-	alarm "[K8s - $IDENTIFIER] [:red_circle:] Cluster API cert has expired"
+	alarm_check_down "cert_cluster"
     else
 	print_colour "Cluster API Cert" "expires in $days_to_expiry days"
     fi
 }
 
 function main() {
+    [ ! -d "/tmp/monok8s-health" ] && mkdir -p /tmp/monok8s-health
     echo
     echo Mono K8s Health "$VERSION" - "$(date)"
     echo
