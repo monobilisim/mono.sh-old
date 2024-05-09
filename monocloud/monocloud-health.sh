@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.3.2"
+script_version="v3.3.3"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -84,8 +84,13 @@ function get_time_diff() {
     if [ -f "${file_path}" ]; then
 
 	old_date=$(awk '{print $1, $2}' <"${file_path}")
-	old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
-	new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
+	if [ "$(uname -s | tr '[:upper:]' '[:lower:]')" == "freebsd" ]; then
+	    old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
+	    new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
+	else
+	    old=$(date -d "$old_date" "+%s")
+	    new=$(date "+%s")
+	fi
 
         time_diff=$(((new - old) / 60))
 
