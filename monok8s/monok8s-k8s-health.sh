@@ -110,7 +110,7 @@ add_deployment() {
     if [ -f "$1" ]; then
 	sed -i '/^DEPLOYMENT=/d' "$1" || true 2> /dev/null
     fi
-    echo "DEPLOYMENT='$2'" >>"$1"
+    echo "DEPLOYMENT='$deployment'" >>"$1"
 }
 
 # add_date "file_path" "locked"
