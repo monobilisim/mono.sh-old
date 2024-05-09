@@ -446,7 +446,10 @@ report_status() {
     local REDMINE_CLOSE=1
     local REDMINE_SEND_UPDATE=0
     message="{\"text\": \"[Mono Cloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    table_md="$(printf '|%s |%s |%s |%s |%s |' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
+    table_md+="\n"
+    table_md+="|--|--|--|--|--|"
     table+='\n'
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber < $PART_USE_LIMIT)")" ]]; then
@@ -462,6 +465,7 @@ report_status() {
 
             [[ "$mountpoint" == "/" ]] && mountpoint="/sys_root"
             [[ -f "/tmp/monocloud-health/${mountpoint//\//_}" ]] && {
+		table_md+="\n$(printf '| %s | %s | %s | %s | %s |\n' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
                 table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
                 underthreshold_disk=1
                 rm -f /tmp/monocloud-health/${mountpoint//\//_}
@@ -486,6 +490,9 @@ report_status() {
 
     local overthreshold_disk=0
     message="{\"text\": \"[Mono Cloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    table_md="$(printf '|%s |%s |%s |%s |%s |' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
+    table_md+="\n"
+    table_md+="|--|--|--|--|--|"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')\n"
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber > $PART_USE_LIMIT)")" ]]; then
@@ -519,8 +526,8 @@ report_status() {
                 overthreshold_disk=1
             fi
 
-
-
+ 
+            table_md+="\n$(printf '| %s | %s | %s | %s | %s |' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
             table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
         done
         message+="$table\n\`\`\`\"}"
@@ -531,12 +538,12 @@ report_status() {
 	    if [ "${REDMINE_ENABLE:-1}" == "1" ]; then
 		if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
 
-		    curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"$(echo $SERVER_NICK | cut -d '-' -f 1)\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} seviyesinin üstüne çıktı\", \"description\": \"\`\`\`\n$table\n\`\`\`\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
+		    curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"$(echo $SERVER_NICK | cut -d '-' -f 1)\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} seviyesinin üstüne çıktı\", \"description\": \"$table_md\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
 		    echo "$"
 		    jq -r '.issue.id' /tmp/monocloud-health/redmine.json > /tmp/monocloud-health/redmine_issue_id
 		    rm -f /tmp/monocloud-health/redmine.json
 		elif [[ "$REDMINE_SEND_UPDATE" == "1" ]]; then
-		    curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"\`\`\`\n$table\n\`\`\`\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+		    curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"$table_md\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
 		fi
 	    fi
 	else
