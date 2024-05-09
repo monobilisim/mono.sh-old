@@ -511,11 +511,11 @@ report_status() {
             partition=${a[3]}
             mountpoint=${a[4]}
 
+            [[ "$mountpoint" == "/" ]] && mountpoint="/sys_root"
+	    
 	    if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}-redmine" && "$(cat /tmp/monocloud-health/${mountpoint//\//_}-redmine)" != "$percentage" ]]; then
 		REDMINE_SEND_UPDATE=1
 	    fi
-
-            [[ "$mountpoint" == "/" ]] && mountpoint="/sys_root"
 	    
 	    echo "$percentage" > /tmp/monocloud-health/${mountpoint//\//_}-redmine
             
