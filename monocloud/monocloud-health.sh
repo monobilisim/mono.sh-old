@@ -510,10 +510,11 @@ report_status() {
 		REDMINE_SEND_UPDATE=1
 	    fi
 
-	    echo "$percentage" > /tmp/monocloud-health/${mountpoint//\//_}-redmine
-
             [[ "$mountpoint" == "/" ]] && mountpoint="/sys_root"
-            if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}" ]]; then
+	    
+	    echo "$percentage" > /tmp/monocloud-health/${mountpoint//\//_}-redmine
+            
+	    if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}" ]]; then
                 if [[ "$(cat /tmp/monocloud-health/${mountpoint//\//_})" == "$(date +%Y-%m-%d)" ]]; then
                     overthreshold_disk=0
                     continue
