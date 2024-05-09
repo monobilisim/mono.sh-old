@@ -360,9 +360,8 @@ check_system_load_and_ram() {
     [[ $is_old == 0 ]] && ram_usage=$(free_custom | awk '/Mem/{printf("%.2f", $3/$2*100)}') || ram_usage=$(free_custom | awk '/Mem/{printf("%.2f", ($3-$6-$7)/$2*100)}')
     local json="{\"load\":\"$load\",\"ram\":\"$ram_usage\"}"
 
-    load_u=$(echo "$load" | awk -F  '.' '{print $1}')
-     
-    if (( $(echo "$load_u < ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT}" | bc -l) )); then
+    
+    if [[ $(echo "$load <= ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT}" | bc -l) -eq 1 ]] ; then
         message="System load limit went below ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} (Current: $load)"
         alarm_check_up "load" "$message" "system"
     else
@@ -378,7 +377,7 @@ check_system_load_and_ram() {
     
 
 
-    if (( $(echo "$load_u < ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT}" | bc -l) )); then
+    if [[ $(echo "$ram_usage <= ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT}" | bc -l) -eq 1 ]] ; then
         message="RAM usage limit went below ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} (Current: $ram_usage%)"
         alarm_check_up "ram" "$message" "system"
     else
