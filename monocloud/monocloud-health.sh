@@ -84,8 +84,13 @@ function get_time_diff() {
     if [ -f "${file_path}" ]; then
 
 	old_date=$(awk '{print $1, $2}' <"${file_path}")
-	old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
-	new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
+	if [ "$(uname -s | tr '[:upper:]' '[:lower:]')" == "freebsd" ]; then
+	    old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
+	    new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
+	else
+	    old=$(date -d "$old_date" "+%s")
+	    new=$(date "+%s")
+	fi
 
         time_diff=$(((new - old) / 60))
 
