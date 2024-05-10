@@ -308,19 +308,21 @@ check_status() {
 
     printf "\n"
 
-    log_header "System Load and RAM"
-    systemstatus="$(check_system_load_and_ram)"
+    if [[ "${SYSTEM_LOAD_AND_RAM:-1}" -eq 1 ]]; then
+	log_header "System Load and RAM"
+	systemstatus="$(check_system_load_and_ram)"
     
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT})") ]]; then
-        print_colour "System Load" "greater than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))" "error"
-    else
-        print_colour "System Load" "less than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))"
-    fi
+	if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT})") ]]; then
+	    print_colour "System Load" "greater than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))" "error"
+	else
+	    print_colour "System Load" "less than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))"
+	fi
 
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT})") ]]; then
-        print_colour "RAM Usage" "greater than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))" "error"
-    else
-        print_colour "RAM Usage" "less than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))"
+	if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT})") ]]; then
+	    print_colour "RAM Usage" "greater than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))" "error"
+	else
+	    print_colour "RAM Usage" "less than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))"
+	fi
     fi
 
     printf "\n"
@@ -443,7 +445,7 @@ print_colour() {
 
 report_status() {
     local diskstatus="$(check_partitions)"
-    local systemstatus="$(check_system_load_and_ram)"
+    [[ "${SYSTEM_LOAD_AND_RAM:-1}" -eq 1 ]] && local systemstatus="$(check_system_load_and_ram)"
     [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
 
     local underthreshold_disk=0
