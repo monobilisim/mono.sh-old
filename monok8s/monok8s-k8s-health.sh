@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Check the health of the mono-k8s cluster
-VERSION="0.2.0"
+VERSION="0.3.0"
 
 RED_FG=$(tput setaf 1)
 GREEN_FG=$(tput setaf 2)
@@ -184,6 +184,9 @@ function alarm_k8s() {
 	"floating_noresponse")
 	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Floating IP '$2' is not responding"
 	;;
+	"ingress_response_fail")
+	    alarm "[K8s - $IDENTIFIER] [:red_circle:] Ingress '$2' returned unexpected response HTTP $3"
+	;;
     esac
 }
 
@@ -317,6 +320,36 @@ function check_pods() {
     done < <(kubectl get pods --all-namespaces --no-headers)
 } 
 
+
+function check_rke2_ingress_endpoint_response() {
+    for namespace in $(kubectl get namespaces | awk '{print $1}' | sed '1d'); do
+	# Get all Ingress resources
+    	ingresses=$(kubectl get ingress -n $namespace -o jsonpath='{.items[*].metadata.name}')
+
+    	# Loop through each Ingress
+    	for ingress in $ingresses; do
+    	  # Get Ingress details (host and paths)
+    	  host=$(kubectl get ingress $ingress -n $namespace -o jsonpath='{.spec.rules[0].host}')
+    	  paths=$(kubectl get ingress $ingress -n $namespace -o jsonpath='{.spec.rules[*].http.paths[*].path}')
+    	
+    	  # Loop through each path in the Ingress
+    	  for path in $paths; do
+    	    # Construct the endpoint URL
+    	    url="http://$(kubectl get ingress $ingress -n $namespace -o jsonpath='{.status.loadBalancer.ingress[*].ip}')$path"
+    	    
+    	    # Get response from the endpoint
+    	    response=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $host" "$url")
+    	
+    	    # Display results
+    	    print_colour "$ingress" "gives $response"
+	    if [ "$response" != "200" ]; then
+		alarm_check_down "ingress_response_fail" "$ingress" "$response"
+	    fi
+    	  done
+    	done
+    done
+}
+
 function check_rke2_ingress_nginx() {
     # Check if master server has publishService as enabled and service as enabled on /var/lib/rancher/rke2/server/manifests/rke2-ingress-nginx.yaml
     echo_status "RKE2 Ingress Nginx:"
@@ -357,6 +390,8 @@ function check_rke2_ingress_nginx() {
 	    alarm_check_down "floating_unexpected" "$floating_ip" "$response"
         fi
     done
+
+    check_rke2_ingress_endpoint_response
 }
 
 function check_certmanager() {
