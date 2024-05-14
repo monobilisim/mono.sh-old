@@ -61,7 +61,8 @@ backup_site() {
             echo "wo_site_root=\$wo_site_name/wp-content" >>siteinfo.txt
             echo "wo_site_config=\$wo_site_name/wp-config.php" >>siteinfo.txt
             echo "wo_site_db_file=\$wo_site_name/\$wo_site_name.sql" >>siteinfo.txt
-            cd ..
+            echo "wo_site_project_name=$project_name" >> siteinfo.txt
+	    cd ..
         elif [[ "$site_type" == "mysql" ]]; then
             local db_name=$(wo site info $site | grep 'DB_NAME' | awk '{print $2}')
             local db_user=$(wo site info $site | grep 'DB_USER' | awk '{print $2}')
@@ -76,6 +77,7 @@ backup_site() {
             echo "wo_site_type=$site_type" >>siteinfo.txt
             echo "wo_site_root=\$wo_site_name/htdocs" >>siteinfo.txt
             echo "wo_site_db_file=\$wo_site_name/\$wo_site_name.sql" >>siteinfo.txt
+            echo "wo_site_project_name=$project_name" >> siteinfo.txt
             cd ..
         elif [[ "$site_type" =~ "php" || "$site_type" == "html" ]]; then
             echo "$color_blue[ INFO ] Taking backup of existing site for \"$site\"..."
@@ -85,6 +87,7 @@ backup_site() {
             echo "wo_site_name=$site" >siteinfo.txt
             echo "wo_site_type=$site_type" >>siteinfo.txt
             echo "wo_site_root=\$wo_site_name/htdocs" >>siteinfo.txt
+            echo "wo_site_project_name=$project_name" >> siteinfo.txt
             cd ..
         fi
 
@@ -167,7 +170,7 @@ check_database() {
         mysql -e "GRANT ALL PRIVILEGES ON wordops.* TO 'wordops'@'localhost';" &>/dev/null && echo "$color_green[  OK  ] Privileges granted successfully..." || { echo "$color_red[ FAIL ] Failed to grant privileges..."; return 1; }
 
         echo "$color_blue[ INFO ] Creating fact table..."
-        mysql wordops -u wordops -pwordops -e "CREATE TABLE IF NOT EXISTS wordops_facts (id INT AUTO_INCREMENT PRIMARY KEY, web_url VARCHAR(100) NOT NULL UNIQUE, site_type VARCHAR(15) NOT NULL, php_version VARCHAR(10), cf_proxy BOOLEAN DEFAULT FALSE, nginx_helper BOOLEAN DEFAULT FALSE, wp_redis BOOLEAN DEFAULT FALSE, wp_admin_url VARCHAR(100), wp_admin_username VARCHAR(50), wp_admin_password VARCHAR(100), sftp_user VARCHAR(100) NOT NULL, sftp_pass VARCHAR(50) NOT NULL);" &>/dev/null && echo "$color_green[  OK  ] Fact table created successfully..." || { echo "$color_red[ FAIL ] Failed to create fact table..."; return 1; }
+	mysql wordops -u wordops -pwordops -e "CREATE TABLE IF NOT EXISTS wordops_facts (id INT AUTO_INCREMENT PRIMARY KEY, web_url VARCHAR(100) NOT NULL UNIQUE, site_type VARCHAR(15) NOT NULL, php_version VARCHAR(10), cf_proxy BOOLEAN DEFAULT FALSE, nginx_helper BOOLEAN DEFAULT FALSE, wp_redis BOOLEAN DEFAULT FALSE, wp_admin_url VARCHAR(100), wp_admin_username VARCHAR(50), wp_admin_password VARCHAR(100), sftp_user VARCHAR(100) NOT NULL, sftp_pass VARCHAR(50) NOT NULL, project_name VARCHAR(100));" &>/dev/null && echo "$color_green[  OK  ] Fact table created successfully..." || { echo "$color_red[ FAIL ] Failed to create fact table..."; return 1; }
         mysql wordops -u wordops -pwordops -e "CREATE TABLE IF NOT EXISTS wordops_stats (id INT AUTO_INCREMENT PRIMARY KEY, server_name VARCHAR(100) NOT NULL, last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP);" &>/dev/null && echo "$color_green[  OK  ] Stats table created successfully..." || { echo "$color_red[ FAIL ] Failed to create stats table..."; return 1; }
         mysql wordops -u wordops -pwordops -e "INSERT INTO wordops_stats (server_name, last_update) VALUES ('$HOSTNAME', CURRENT_TIMESTAMP);" &>/dev/null && echo "$color_green[  OK  ] Stats table updated successfully..." || { echo "$color_red[ FAIL ] Failed to update stats table..."; return 1; }
     else 
@@ -183,7 +186,7 @@ database_manager() {
     case $1 in
     "insert")
         local site_name=$(echo $2 | cut -d '"' -f2)
-        mysql wordops -u wordops -pwordops -e "INSERT INTO wordops_facts (web_url, site_type, php_version, cf_proxy, nginx_helper, wp_redis, wp_admin_url, wp_admin_username, wp_admin_password, sftp_user, sftp_pass) VALUES ($2);" &>/dev/null && echo -e "$color_green[  OK  ] Inserted successfully for $site_name..." || { echo -e "$color_red[ FAIL ] Failed to insert for $site_name..."; return 1; }
+        mysql wordops -u wordops -pwordops -e "INSERT INTO wordops_facts (web_url, site_type, php_version, cf_proxy, nginx_helper, wp_redis, wp_admin_url, wp_admin_username, wp_admin_password, sftp_user, sftp_pass, project_name) VALUES ($2);" &>/dev/null && echo -e "$color_green[  OK  ] Inserted successfully for $site_name..." || { echo -e "$color_red[ FAIL ] Failed to insert for $site_name..."; return 1; }
         ;;
     "update")
         mysql wordops -u wordops -pwordops -e "UPDATE wordops_facts SET $2=$3 WHERE web_url=$4;" &>/dev/null && echo -e "$color_green[  OK  ] Updated successfully for $4..." || { echo -e "$color_red[ FAIL ] Failed to update for $4..."; return 1; }
@@ -328,10 +331,15 @@ save_fact() {
         local cf_proxy=$(echo $site_facts | jq -r ".[$i].cf_proxy")
         local nginx_helper=$(echo $site_facts | jq -r ".[$i].nginx_helper")
         local wp_redis=$(echo $site_facts | jq -r ".[$i].wp_redis")
+	local project_name=$(echo $site_facts | jq -r ".[$i].project_name")
         local sftp_user=$(echo $site_facts | jq -r ".[$i].sftp_user")
         local sftp_pass=$(echo $site_facts | jq -r ".[$i].sftp_pass")
 
         if [[ "$CRON_MODE" != "1" ]]; then
+	    if [[ -n "$project_name" ]]; then
+                read -p "$(echo -e "$color_yellow[ ???? ] Do you want to update/add Project name for $web_url? (y/N): ")" question
+		[[ "$question" == "y" ]] && read -p "$(echo -e "$color_yellow[ ???? ] Project name for $web_url: ")" project_name
+	    fi
             if [[ "$site_type" == "WordPress" ]]; then
                 echo -e "$color_blue[ INFO ] WordPress site detected."
                 read -p "$(echo -e "$color_yellow[ ???? ] Do you want to update WordPress admin URL, username and password for $web_url? (y/N): ")" question
@@ -352,13 +360,15 @@ save_fact() {
                 [[ -z "$wp_admin_user" ]] && { wp_admin_user="-"; }
                 [[ -z "$wp_admin_pass" ]] && { wp_admin_pass="-"; }
             fi
-            database_manager "insert" "\"$web_url\", \"$site_type\", \"$php_version\", \"$cf_proxy\", \"$nginx_helper\", \"$wp_redis\", \"$wp_admin_url\", \"$wp_admin_user\", \"$wp_admin_pass\", \"$sftp_user\", \"$sftp_pass\""
+            [[ -z "$project_name" ]] && { project_name="-"; }
+            database_manager "insert" "\"$web_url\", \"$site_type\", \"$php_version\", \"$cf_proxy\", \"$nginx_helper\", \"$wp_redis\", \"$wp_admin_url\", \"$wp_admin_user\", \"$wp_admin_pass\", \"$sftp_user\", \"$sftp_pass\", \"$project_name\""
         else
             database_manager "update" "site_type" "\"$site_type\"" "\"$web_url\""
             [[ "$site_type" == "Static" ]] && { database_manager "update" "php_version" "\"-\"" "\"$web_url\""; } || { database_manager "update" "php_version" "\"$php_version\"" "\"$web_url\""; }
             database_manager "update" "cf_proxy" "\"$cf_proxy\"" "\"$web_url\""
             database_manager "update" "nginx_helper" "\"$nginx_helper\"" "\"$web_url\""
             database_manager "update" "wp_redis" "\"$wp_redis\"" "\"$web_url\""
+            database_manager "update" "project_name" "\"$project_name\"" "\"$web_url\""
             if [[ "$site_type" == "WordPress" ]]; then
                 [[ ! -z "$wp_admin_url" ]] && { database_manager "update" "wp_admin_url" "\"$wp_admin_url\"" "\"$web_url\""; }
                 [[ ! -z "$wp_admin_user" ]] && { database_manager "update" "wp_admin_username" "\"$wp_admin_user\"" "\"$web_url\""; }
