@@ -2,7 +2,7 @@
 ###~ description: This script is used to manage WordOps
 
 #~ variables
-script_version="3.0.0"
+script_version="3.1.0"
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
