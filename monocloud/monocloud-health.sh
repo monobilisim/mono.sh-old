@@ -488,7 +488,7 @@ report_status() {
 	    if [[ "${REDMINE_ENABLE:-1}" == "1" && -f "/tmp/monocloud-health/redmine_issue_id" && "$REDMINE_CLOSE" == "1" ]]; then
 		# Delete issue
 		#curl -fsSL -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
-		curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Threshold %$percentage altına geri indi, iş kapatıldı\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+		curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Disk kullanım oranı %$percentage, %$PART_USE_LIMIT altına geri indiği için iş kapatılıyor\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
 		rm -f /tmp/monocloud-health/redmine_issue_id
 	    fi
 	fi
