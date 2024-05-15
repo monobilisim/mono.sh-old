@@ -335,10 +335,8 @@ save_fact() {
         local sftp_pass=$(echo $site_facts | jq -r ".[$i].sftp_pass")
 
         if [[ "$CRON_MODE" != "1" ]]; then
-	    if [[ -z "$project_name" ]]; then
-                read -p "$(echo -e "$color_yellow[ ???? ] Do you want to update/add Project name for $web_url? (y/N): ")" question
-		[[ "$question" == "y" ]] && read -p "$(echo -e "$color_yellow[ ???? ] Project name for $web_url: ")" project_name
-	    fi
+            read -p "$(echo -e "$color_yellow[ ???? ] Do you want to update/add Project name for $web_url? (y/N): ")" question
+	    [[ "$question" == "y" ]] && read -p "$(echo -e "$color_yellow[ ???? ] Project name for $web_url: ")" project_name
             if [[ "$site_type" == "WordPress" ]]; then
                 echo -e "$color_blue[ INFO ] WordPress site detected."
                 read -p "$(echo -e "$color_yellow[ ???? ] Do you want to update WordPress admin URL, username and password for $web_url? (y/N): ")" question
