@@ -2,7 +2,7 @@
 ###~ description: This script is used to manage WordOps
 
 #~ variables
-script_version="3.1.0"
+script_version="3.1.1"
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -368,7 +368,7 @@ save_fact() {
             database_manager "update" "cf_proxy" "\"$cf_proxy\"" "\"$web_url\""
             database_manager "update" "nginx_helper" "\"$nginx_helper\"" "\"$web_url\""
             database_manager "update" "wp_redis" "\"$wp_redis\"" "\"$web_url\""
-            database_manager "update" "project_name" "\"$project_name\"" "\"$web_url\""
+            [[ -n "$project_name" ]] && database_manager "update" "project_name" "\"$project_name\"" "\"$web_url\""
             if [[ "$site_type" == "WordPress" ]]; then
                 [[ ! -z "$wp_admin_url" ]] && { database_manager "update" "wp_admin_url" "\"$wp_admin_url\"" "\"$web_url\""; }
                 [[ ! -z "$wp_admin_user" ]] && { database_manager "update" "wp_admin_username" "\"$wp_admin_user\"" "\"$web_url\""; }
