@@ -331,7 +331,6 @@ save_fact() {
         local cf_proxy=$(echo $site_facts | jq -r ".[$i].cf_proxy")
         local nginx_helper=$(echo $site_facts | jq -r ".[$i].nginx_helper")
         local wp_redis=$(echo $site_facts | jq -r ".[$i].wp_redis")
-	local project_name=$(echo $site_facts | jq -r ".[$i].project_name")
         local sftp_user=$(echo $site_facts | jq -r ".[$i].sftp_user")
         local sftp_pass=$(echo $site_facts | jq -r ".[$i].sftp_pass")
 
