@@ -335,7 +335,7 @@ save_fact() {
         local sftp_pass=$(echo $site_facts | jq -r ".[$i].sftp_pass")
 
         if [[ "$CRON_MODE" != "1" ]]; then
-	    if [[ -n "$project_name" ]]; then
+	    if [[ -z "$project_name" ]]; then
                 read -p "$(echo -e "$color_yellow[ ???? ] Do you want to update/add Project name for $web_url? (y/N): ")" question
 		[[ "$question" == "y" ]] && read -p "$(echo -e "$color_yellow[ ???? ] Project name for $web_url: ")" project_name
 	    fi
