@@ -29,3 +29,4 @@ There are scripts that provide more than one convenience in this collection
 | [Monofon](https://github.com/monobilisim/mono.sh/tree/main/monofon) | Scripts that simplify Monofon |
 | [MonoK8s](https://github.com/monobilisim/mono.sh/tree/main/monok8s) | Script Collection for K8s Services |
 | [Monomail](https://github.com/monobilisim/mono.sh/tree/main/monomail) | Scripts for Monomail |
+| [ERROR](https://github.com/monobilisim/mono.sh/tree/main/monowpp) | ./monowpp/.dirinfo not defined... |
