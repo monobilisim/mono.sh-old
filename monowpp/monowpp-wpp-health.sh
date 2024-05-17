@@ -170,12 +170,13 @@ function wpp_check() {
 	    -H "Content-Type: application/json" \
 	    -H "Authorization: Bearer $TOKEN" | jq -c -r '.message')"
 	
-	print_colour "Session $SESSION" "$STATUS"
 	
 	if [[ "$STATUS" == "Connected" ]]; then
+	    print_colour "Session $SESSION" "$STATUS"
 	    alarm_check_up "wpp_session_$SESSION" "Session $SESSION is connected again" "$ALARM_INTERVAL"
 	else
 	   alarm_check_down "wpp_session_$SESSION" "Session $SESSION is not connected, status '$STATUS'" "$ALARM_INTERVAL"
+	    print_colour "Session $SESSION" "$STATUS" "error"
 	fi
     done
 }
