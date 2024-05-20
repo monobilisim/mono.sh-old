@@ -3,19 +3,19 @@
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-VERSION=v0.1.0
+VERSION=v0.2.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
     exit 0
 }
 
-mkdir -p /tmp/monowpp
+mkdir -p /tmp/monocloud-wppconnect
 
-if [[ -f /etc/monowpp-wpp-health.conf ]]; then
-    . /etc/monowpp-wpp-health.conf
+if [[ -f /etc/monocloud-wppconnect-health.conf ]]; then
+    . /etc/monocloud-wppconnect-health.conf
 else
-    echo "Config file doesn't exists at /etc/monowpp-wpp-health.conf"
+    echo "Config file doesn't exists at /etc/monocloud-wppconnect-health.conf"
     exit 1
 fi
 
@@ -69,7 +69,7 @@ function get_time_diff() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monowpp/monowpp_${service_name}_status.txt"
+    file_path="/tmp/monocloud-wppconnect/monocloud-wppconnect_${service_name}_status.txt"
 
     if [ -f "${file_path}" ]; then
 
@@ -96,7 +96,7 @@ function alarm_check_down() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monowpp/monowpp_${service_name}_status.txt"
+    file_path="/tmp/monocloud-wppconnect/monocloud-wppconnect_${service_name}_status.txt"
 
     if [ -z $3 ]; then
         if [ -f "${file_path}" ]; then
@@ -104,11 +104,11 @@ function alarm_check_down() {
             current_date=$(date "+%Y-%m-%d")
             if [ "${old_date}" != "${current_date}" ]; then
                 date "+%Y-%m-%d %H:%M" >"${file_path}"
-                alarm "[monowpp - $IDENTIFIER] [:red_circle:] $2"
+                alarm "[Mono Cloud WPPConnect - $IDENTIFIER] [:red_circle:] $2"
             fi
         else
             date "+%Y-%m-%d %H:%M" >"${file_path}"
-            alarm "[monowpp - $IDENTIFIER] [:red_circle:] $2"
+            alarm "[Mono Cloud WPPConnect - $IDENTIFIER] [:red_circle:] $2"
         fi
     else
         if [ -f "${file_path}" ]; then
@@ -117,13 +117,13 @@ function alarm_check_down() {
             current_date=$(date "+%Y-%m-%d")
             if [ "${old_date}" != "${current_date}" ]; then
                 date "+%Y-%m-%d %H:%M locked" >"${file_path}"
-                alarm "[monowpp - $IDENTIFIER] [:red_circle:] $2"
+                alarm "[Mono Cloud WPPConnect - $IDENTIFIER] [:red_circle:] $2"
             else
                 if ! $locked; then
                     time_diff=$(get_time_diff "$1")
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
-                        alarm "[monowpp - $IDENTIFIER] [:red_circle:] $2"
+                        alarm "[Mono Cloud WPPConnect - $IDENTIFIER] [:red_circle:] $2"
                         if [ $3 == "service" ] || [ $3 == "queue" ]; then
                             check_active_sessions
                         fi
@@ -142,19 +142,19 @@ function alarm_check_up() {
         return
     }
     service_name=${1//\//-}
-    file_path="/tmp/monowpp/monowpp_${service_name}_status.txt"
+    file_path="/tmp/monocloud-wppconnect/monocloud-wppconnect_${service_name}_status.txt"
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
 
         if [ -z $3 ]; then
             rm -rf "${file_path}"
-            alarm "[monowpp - $IDENTIFIER] [:check:] $2"
+            alarm "[Mono Cloud WPPConnect - $IDENTIFIER] [:check:] $2"
         else
             [[ -z $(awk '{print $3}' <"$file_path") ]] && locked=false || locked=true
             rm -rf "${file_path}"
             if $locked; then
-                alarm "[monowpp - $IDENTIFIER] [:check:] $2"
+                alarm "[Mono Cloud WPPConnect - $IDENTIFIER] [:check:] $2"
             fi
         fi
     fi
@@ -203,7 +203,7 @@ function main() {
     wpp_check
 }
 
-pidfile=/var/run/monowpp.sh.pid
+pidfile=/var/run/monocloud-wppconnect.sh.pid
 if [ -f ${pidfile} ]; then
     oldpid=$(cat ${pidfile})
 
