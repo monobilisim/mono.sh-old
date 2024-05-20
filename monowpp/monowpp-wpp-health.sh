@@ -161,22 +161,25 @@ function alarm_check_up() {
 }
 
 function wpp_check() {
-    curl -X GET --location "$WPP_URL/api/$WPP_SECRET/show-all-sessions" \
+    curl -fsSL -X GET --location "$WPP_URL/api/$WPP_SECRET/show-all-sessions" \
 	-H "Accept: application/json" \
 	-H "Content-Type: application/json" | jq -c -r '.response[]' | while read -r SESSION; do
-	TOKEN="$(curl -X POST --location "$WPP_URL/api/$SESSION/$WPP_SECRET/generate-token" | jq -r '.token')"
-	STATUS="$(curl -X GET --location "$WPP_URL/api/$SESSION/check-connection-session" \
+	TOKEN="$(curl -fsSL -X POST --location "$WPP_URL/api/$SESSION/$WPP_SECRET/generate-token" | jq -r '.token')"
+	STATUS="$(curl -fsSL -X GET --location "$WPP_URL/api/$SESSION/check-connection-session" \
 	    -H "Accept: application/json" \
 	    -H "Content-Type: application/json" \
 	    -H "Authorization: Bearer $TOKEN" | jq -c -r '.message')"
-	
-	
+	CONTACT_NAME="$(curl -fsSL -X GET --location "$WPP_URL/api/$SESSION/contact/$SESSION" \
+	    -H "Accept: application/json" \
+	    -H "Content-Type: application/json" \
+	    -H "Authorization: Bearer $TOKEN" | jq -c -r '.response.name // .response.pushname // "No Name"')"
+
 	if [[ "$STATUS" == "Connected" ]]; then
-	    print_colour "Session $SESSION" "$STATUS"
-	    alarm_check_up "wpp_session_$SESSION" "Session $SESSION is connected again" "$ALARM_INTERVAL"
+	    print_colour "$CONTACT_NAME, Session $SESSION" "$STATUS"
+	    alarm_check_up "wpp_session_$SESSION" "Session $SESSION with name $CONTACT_NAME is connected again" "$ALARM_INTERVAL"
 	else
-	   alarm_check_down "wpp_session_$SESSION" "Session $SESSION is not connected, status '$STATUS'" "$ALARM_INTERVAL"
-	    print_colour "Session $SESSION" "$STATUS" "error"
+	   alarm_check_down "wpp_session_$SESSION" "Session $SESSION with name $CONTACT_NAME is not connected, status '$STATUS'" "$ALARM_INTERVAL"
+	    print_colour "$CONTACT_NAME, Session $SESSION" "$STATUS" "error"
 	fi
     done
 }
