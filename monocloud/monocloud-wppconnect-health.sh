@@ -198,7 +198,7 @@ function check_active_sessions() {
 
 function main() {
     printf '\n'
-    echo "MonoWPP $VERSION - $(date)"
+    echo "Mono Cloud WPPConnect $VERSION - $(date)"
     printf '\n'
     wpp_check
 }
