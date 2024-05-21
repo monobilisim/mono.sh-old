@@ -46,11 +46,11 @@ containsElement() {
 function check_service() {
     if [ "$is_old" == "0" ]; then
         if systemctl status "$1" >/dev/null; then
-            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER"
+            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER" "service"
             print_colour "$1" "running"
         else
             print_colour "$1" "not running" "error"
-            alarm_check_down "$1" "Service $1 is not running at $IDENTIFIER"
+            alarm_check_down "$1" "Service $1 is not running at $IDENTIFIER" "service"
             if [ "$AUTO_RESTART" == "1" ]; then
                 if [[ "$1" == "freepbx" || "$1" == "asterisk" ]]; then
                     restart_asterisk
@@ -64,7 +64,7 @@ function check_service() {
                             print_colour "Couldn't start" "$1"
                             alarm "Couldn't start $1 at $IDENTIFIER"
                         else
-                            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER"
+                            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER" "service"
                         fi
                     fi
                 fi
@@ -72,11 +72,11 @@ function check_service() {
         fi
     else
         if service "$1" status >/dev/null; then
-            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER"
+            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER" "service"
             print_colour "$1" "running"
         else
             print_colour "$1" "not running" "error"
-            alarm_check_down "$1" "Service $1 is not running at $IDENTIFIER"
+            alarm_check_down "$1" "Service $1 is not running at $IDENTIFIER" "service"
             if [ "$AUTO_RESTART" == "1" ]; then
                 if [[ "$1" == "freepbx" || "$1" == "asterisk" ]]; then
                     restart_asterisk
@@ -90,7 +90,7 @@ function check_service() {
                             print_colour "Couldn't start" "$1"
                             alarm "Couldn't start $1 at $IDENTIFIER"
                         else
-                            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER"
+                            alarm_check_up "$1" "Service $1 started running again at $IDENTIFIER" "service"
                         fi
                     fi
                 fi
@@ -177,7 +177,7 @@ function restart_asterisk() {
         IFS=$OLDIFS
     fi
     echo "Restarted ${BLUE_FG}${SERVICES[2]}${RESET}" "at $IDENTIFIER"
-    alarm_check_up "Restarted ${SERVICES[2]} at $IDENTIFIER"
+    alarm_check_up "Restarted ${SERVICES[2]} at $IDENTIFIER" "service"
 }
 
 function check_monofon_services() {
@@ -195,7 +195,7 @@ function check_monofon_services() {
     fi
 
     if [ -n "$mono_services" ]; then
-        alarm_check_up "monofon_services" "Monofon services are available at $IDENTIFIER"
+        alarm_check_up "monofon_services" "Monofon services are available at $IDENTIFIER" "service"
 
         for service in $mono_services; do
             if containsElement "$service" "${IGNORED_SERVICES[@]}"; then
@@ -206,7 +206,7 @@ function check_monofon_services() {
 
             if [ "${is_active,,}" != 'running' ]; then
                 print_colour "$service_name" "not running" "error"
-                alarm_check_down "$service_name" "$service_name is not running at $IDENTIFIER"
+                alarm_check_down "$service_name" "$service_name is not running at $IDENTIFIER" "service"
                 if [ "$AUTO_RESTART" == "1" ]; then
                     time_diff=$(get_time_diff "$service_name")
                     if ((time_diff >= RESTART_ATTEMPT_INTERVAL)) || ((time_diff == 0)); then
@@ -217,18 +217,18 @@ function check_monofon_services() {
                             print_colour "Couldn't restart" "$service"
                             alarm "Couldn't restart $service at $IDENTIFIER"
                         else
-                            alarm_check_up "$service_name" "Service $service_name started running again at $IDENTIFIER"
+                            alarm_check_up "$service_name" "Service $service_name started running again at $IDENTIFIER" "service"
                         fi
                     fi
                 fi
             else
-                alarm_check_up "$service_name" "Service $service_name started running again at $IDENTIFIER"
+                alarm_check_up "$service_name" "Service $service_name started running again at $IDENTIFIER" "service"
                 print_colour "$service_name" "running"
             fi
         done
     else
         echo "${RED_FG}No monofon services found!${RESET}"
-        alarm_check_down "monofon_services" "No monofon services found at $IDENTIFIER"
+        alarm_check_down "monofon_services" "No monofon services found at $IDENTIFIER" "service"
     fi
 
     IFS=$OLDIFS
@@ -239,10 +239,10 @@ function check_concurrent_calls() {
     active_calls=$(asterisk -rx "core show channels" | grep "active calls" | awk '{print $1}')
 
     if [ "$active_calls" -gt "$CONCURRENT_CALLS" ]; then
-        alarm_check_down "active_calls" "Number of active calls at $IDENTIFIER is ${active_calls}"
+        alarm_check_down "active_calls" "Number of active calls at $IDENTIFIER is ${active_calls}" "service"
         print_colour "Number of active calls" "${active_calls}" "error"
     else
-        alarm_check_up "active_calls" "Number of active calls at $IDENTIFIER is below $CONCURRENT_CALLS - Active calls: ${active_calls}"
+        alarm_check_up "active_calls" "Number of active calls at $IDENTIFIER is below $CONCURRENT_CALLS - Active calls: ${active_calls}" "service"
         print_colour "Number of active calls" "${active_calls}"
     fi
 }
