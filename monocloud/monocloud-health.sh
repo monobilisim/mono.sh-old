@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.3.4"
+script_version="v3.3.5"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -537,22 +537,24 @@ report_status() {
             table_md+="\n$(printf '| %s | %s | %s | %s | %s |' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
             table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
         done
-        message+="$table\n\`\`\`\"}"
         IFS=$oldifs
         if [[ "$overthreshold_disk" == "1" ]]; then
-	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
-	    
+            message+="$table\n\n"
+ 
 	    if [ "${REDMINE_ENABLE:-1}" == "1" ]; then
-		if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
+		    if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
 
-		    curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"$(echo $SERVER_NICK | cut -d '-' -f 1)\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} seviyesinin üstüne çıktı\", \"description\": \"$table_md\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
-		    echo "$"
-		    jq -r '.issue.id' /tmp/monocloud-health/redmine.json > /tmp/monocloud-health/redmine_issue_id
-		    rm -f /tmp/monocloud-health/redmine.json
-		elif [[ "$REDMINE_SEND_UPDATE" == "1" ]]; then
-		    curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"$table_md\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
-		fi
-	    fi
+		        curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"$(echo $SERVER_NICK | cut -d '-' -f 1)\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} seviyesinin üstüne çıktı\", \"description\": \"$table_md\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
+		        echo "$"
+		        jq -r '.issue.id' /tmp/monocloud-health/redmine.json > /tmp/monocloud-health/redmine_issue_id
+		        rm -f /tmp/monocloud-health/redmine.json
+            elif [[ "$REDMINE_SEND_UPDATE" == "1" ]]; then
+		        curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"$table_md\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+		    fi
+		    message="Redmine issue: $REDMINE_URL/issues/$(cat /tmp/monocloud-health/redmine_issue_id)"
+        fi
+        message+="\n\`\`\`\"}"
+	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
 	else
 	    echo "There's no alarm for Overthreshold (DISK) today..."
 	fi
