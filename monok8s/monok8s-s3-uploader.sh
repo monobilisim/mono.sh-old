@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+###~ description: Upload K8s resource logs to S3 bucket
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
