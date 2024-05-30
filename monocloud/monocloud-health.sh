@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.3.7"
+script_version="v3.3.8"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -258,10 +258,6 @@ function dynamic_limit() {
 	export RAM_LIMIT_DYNAMIC="$(cat /tmp/monocloud-health/checks/last_ram_limit_dynamic)"
     fi
 
-    if [ -f "/tmp/monocloud-health/checks/last_load_limit_dynamic" ]; then
-	export LOAD_LIMIT_DYNAMIC="$(cat /tmp/monocloud-health/checks/last_load_limit_dynamic)"
-    fi
-
     if [[ $(ls -1 *.json | wc -l) -ge $DYNAMIC_LIMIT_INTERVAL ]]; then
        for file in *.json; do
            LOAD_LIMIT_ARRAY+=( $(jq -r '.load' $file) )
@@ -269,20 +265,14 @@ function dynamic_limit() {
        done
 	
        # Get the average of the array
-       export LOAD_LIMIT_DYNAMIC=$(echo "scale=2; ($(sum_array ${LOAD_LIMIT_ARRAY[@]}) / ${#LOAD_LIMIT_ARRAY[@]})" | bc)
-       if [[ "${LOAD_LIMIT_DYNAMIC:0:1}" == "." ]]; then
-	    export LOAD_LIMIT_DYNAMIC="0${LOAD_LIMIT_DYNAMIC}"
-       fi
        export RAM_LIMIT_DYNAMIC=$(echo "scale=2; ($(sum_array ${RAM_LIMIT_ARRAY[@]}) / ${#RAM_LIMIT_ARRAY[@]})" | bc)  
 
        rm -f /tmp/monocloud-health/checks/*
        
        echo "$RAM_LIMIT_DYNAMIC" > /tmp/monocloud-health/checks/last_ram_limit_dynamic
-       echo "$LOAD_LIMIT_DYNAMIC" > /tmp/monocloud-health/checks/last_load_limit_dynamic
     fi
     
     [ -z "$RAM_LIMIT_DYNAMIC" ] && export RAM_LIMIT_DYNAMIC=$RAM_LIMIT
-    [ -z "$LOAD_LIMIT_DYNAMIC" ] && export LOAD_LIMIT_DYNAMIC=$LOAD_LIMIT
 
     cd - &>/dev/null
 }
@@ -312,10 +302,10 @@ check_status() {
 	log_header "System Load and RAM"
 	systemstatus="$(check_system_load_and_ram)"
     
-	if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT})") ]]; then
-	    print_colour "System Load" "greater than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))" "error"
+    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT_CPU)") ]]; then
+	    print_colour "System Load" "greater than $LOAD_LIMIT_CPU ($(echo $systemstatus | jq -r '.load'))" "error"
 	else
-	    print_colour "System Load" "less than ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} ($(echo $systemstatus | jq -r '.load'))"
+	    print_colour "System Load" "less than $LOAD_LIMIT_CPU ($(echo $systemstatus | jq -r '.load'))"
 	fi
 
 	if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT})") ]]; then
@@ -363,11 +353,11 @@ check_system_load_and_ram() {
     local json="{\"load\":\"$load\",\"ram\":\"$ram_usage\"}"
 
     
-    if [[ $(echo "$load <= ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT}" | bc -l) -eq 1 ]] ; then
-        message="System load limit went below ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} (Current: $load)"
+    if [[ $(echo "$load <= $LOAD_LIMIT_CPU" | bc -l) -eq 1 ]] ; then
+        message="System load limit went below $LOAD_LIMIT_CPU (Current: $load)"
         alarm_check_up "load" "$message" "system"
     else
-        message="The system load limit has exceeded ${LOAD_LIMIT_DYNAMIC:-$LOAD_LIMIT} (Current: $load)"
+        message="The system load limit has exceeded $LOAD_LIMIT_CPU (Current: $load)"
         alarm_check_down "load" "$message" "system"
     fi
 
@@ -377,8 +367,6 @@ check_system_load_and_ram() {
 	ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
     fi
     
-
-
     if [[ $(echo "$ram_usage <= ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT}" | bc -l) -eq 1 ]] ; then
         message="RAM usage limit went below ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} (Current: $ram_usage%)"
         alarm_check_up "ram" "$message" "system"
@@ -613,6 +601,8 @@ main() {
     fi
     
     check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
+    
+    export LOAD_LIMIT_CPU="$( echo "$(nproc) * ${LOAD_LIMIT_MULTIPLIER:-1}" | bc ) "
     
     [[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
     [[ -z "$DYNAMIC_LIMIT_INTERVAL" ]] && DYNAMIC_LIMIT_INTERVAL=100
