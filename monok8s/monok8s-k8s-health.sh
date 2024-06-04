@@ -353,7 +353,7 @@ function check_rke2_ingress_endpoint_response() {
     	    url="http://$(kubectl get ingress $ingress -n $namespace -o jsonpath='{.status.loadBalancer.ingress[*].ip}')$path"
     	    
     	    # Get response from the endpoint
-    	    response=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $host" "$url")
+    	    response=$(curl -L -s -o /dev/null -w "%{http_code}" -H "Host: $host" "$url")
     	
     	    # Display results
     	    print_colour "$ingress" "gives $response"
