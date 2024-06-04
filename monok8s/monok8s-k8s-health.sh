@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Check the health of the mono-k8s cluster
-VERSION="0.3.1"
+VERSION="0.3.0"
 
 RED_FG=$(tput setaf 1)
 GREEN_FG=$(tput setaf 2)
@@ -27,21 +27,6 @@ fi
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
 fi
-
-# Find all kubectl entries (files or symlinks) within the target directory structure
-for kubectl_path in /var/lib/rancher/rke2/data/*/bin/kubectl; do
-    # Check if it's an existing file OR a symlink (but not a directory)
-    if [[ ( -f "$kubectl_path" || -L "$kubectl_path" ) && ! -d "$kubectl_path" ]]; then
-        # Extract the base directory from the kubectl path
-        bin_dir=$(dirname "$kubectl_path")
-        
-        # Check if the directory is already in PATH
-        if [[ ! ":$PATH:" == *":$bin_dir:"* ]]; then
-            # Safely append to PATH, avoiding duplicates
-            PATH="$bin_dir:$PATH"
-        fi
-    fi
-done
 
 # Check if kubectl is installed
 if ! command -v kubectl &> /dev/null; then
