@@ -16,6 +16,21 @@ else
     exit 1
 fi
 
+# https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
+if [ -z "$(command -v yq)" ]; then
+    read -r -p "Couldn't find yq. Do you want to download it and put it under /usr/local/bin? [y/n]: " yn
+    case $yn in
+    [Yy]*)
+	curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64')" --output /usr/local/bin/yq
+	chmod +x /usr/local/bin/yq
+	;;
+    [Nn]*)
+        echo "Aborted"
+        exit 1
+        ;;
+    esac
+fi
+
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
 fi
