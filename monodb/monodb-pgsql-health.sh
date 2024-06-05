@@ -253,6 +253,7 @@ function cluster_role() {
                                 alarm "[Patroni - $IDENTIFIER] [:check:] Leader switch hook executed successfully"
                             else
                                 alarm "[Patroni - $IDENTIFIER] [:red_circle:] Leader switch hook failed with exit code $EXIT_CODE"
+                            fi
                         fi
                     fi
                 fi
