@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of PostgreSQL and Patroni cluster
-VERSION=v0.9.0
+VERSION=v0.9.1
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -242,7 +242,18 @@ function cluster_role() {
                 print_colour "  Old Role of $cluster" "$old_role" "error"
                 printf '\n'
                 alarm "[Patroni - $IDENTIFIER] [:info:] Role of $cluster has changed! Old: **$old_role**, Now: **${cluster_roles[$i]}**"
-                [ "${cluster_roles[$i]}" == "leader" ] && alarm "[Patroni - $IDENTIFIER] [:check:] New leader is $cluster!"
+                if [ "${cluster_roles[$i]}" == "leader" ]; then
+                    alarm "[Patroni - $IDENTIFIER] [:check:] New leader is $cluster!"
+                    if [[ -n "$LEADER_SWITCH_HOOK" ]]; then
+                        eval "$LEADER_SWITCH_HOOK"
+                        if [ $? -eq 0 ]; then
+                            alarm "[Patroni - $IDENTIFIER] [:check:] Leader switch hook executed successfully"
+                        else
+                            alarm "[Patroni - $IDENTIFIER] [:red_circle:] Leader switch hook failed"
+                        fi
+                    fi
+                fi
+
             fi
         fi
         i=$((i + 1))
