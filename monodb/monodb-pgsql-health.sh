@@ -244,12 +244,15 @@ function cluster_role() {
                 alarm "[Patroni - $IDENTIFIER] [:info:] Role of $cluster has changed! Old: **$old_role**, Now: **${cluster_roles[$i]}**"
                 if [ "${cluster_roles[$i]}" == "leader" ]; then
                     alarm "[Patroni - $IDENTIFIER] [:check:] New leader is $cluster!"
-                    if [[ -n "$LEADER_SWITCH_HOOK" ]]; then
-                        eval "$LEADER_SWITCH_HOOK"
-                        if [ $? -eq 0 ]; then
-                            alarm "[Patroni - $IDENTIFIER] [:check:] Leader switch hook executed successfully"
-                        else
-                            alarm "[Patroni - $IDENTIFIER] [:red_circle:] Leader switch hook failed"
+                    if [[ -n "$LEADER_SWITCH_HOOK" ]] && [[ -f "/etc/patroni/patroni.yml" ]]; then
+                        IP_PATRONI="$(cat /etc/patroni/patroni.yml | yq -r .restapi.listen)"
+                        if [[ "$(curl "$IP_PATRONI" | jq -r .role)" == "master" ]]; then
+                            eval "$LEADER_SWITCH_HOOK"
+                            EXIT_CODE=$?
+                            if [ $? -eq 0 ]; then
+                                alarm "[Patroni - $IDENTIFIER] [:check:] Leader switch hook executed successfully"
+                            else
+                                alarm "[Patroni - $IDENTIFIER] [:red_circle:] Leader switch hook failed with exit code $EXIT_CODE"
                         fi
                     fi
                 fi
