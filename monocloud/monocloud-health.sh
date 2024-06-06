@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.3.8"
+script_version="v3.3.9"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -354,10 +354,10 @@ check_system_load_and_ram() {
 
     
     if [[ $(echo "$load <= $LOAD_LIMIT_CPU" | bc -l) -eq 1 ]] ; then
-        message="System load limit went below $LOAD_LIMIT_CPU (Current: $load)"
+        message="System load limit went below $LOAD_LIMIT_CPU (Current: $load, Multiplier: $LOAD_LIMIT_MULTIPLIER, CPU: $(nproc))"
         alarm_check_up "load" "$message" "system"
     else
-        message="The system load limit has exceeded $LOAD_LIMIT_CPU (Current: $load)"
+        message="The system load limit has exceeded $LOAD_LIMIT_CPU (Current: $load, Multiplier: $LOAD_LIMIT_MULTIPLIER, CPU: $(nproc))"
         alarm_check_down "load" "$message" "system"
     fi
 
