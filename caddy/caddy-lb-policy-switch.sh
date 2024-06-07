@@ -177,10 +177,14 @@ function change_upstreams() {
 
 function adjust_api_urls() {
     CADDY_API_URLS_NEW=()
-    for URL_UP in "${CADDY_API_URLS[@]}"; do
-        URL="${URL_UP#*@}"
-        USERNAME_PASSWORD="${URL_UP%%@*}"
-        for i in "${CADDY_LB_URLS[@]}"; do
+    
+    for i in "${CADDY_LB_URLS[@]}"; do
+        for URL_UP in "${CADDY_API_URLS[@]}"; do
+   
+            URL="${URL_UP#*@}"
+            USERNAME_PASSWORD="${URL_UP%%@*}"
+        
+            debug "LB $i"
             url_new="$(hostname_to_url "$(curl -s "$i" | grep "Hostname:" | awk '{print $2}')")"
             if [[ "$url_new" == "$URL" ]]; then
                 debug "$url_new is the same as URL, adding to CADDY_API_URLS_NEW"
@@ -188,16 +192,16 @@ function adjust_api_urls() {
                 debug "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
             fi
         done
+    
     done
 
     for URL_UP in "${CADDY_API_URLS[@]}"; do
-        if [[ ! " ${CADDY_API_URLS_NEW[@]} " =~ " ${URL_UP} " ]]; then
-            CADDY_API_URLS_NEW+=("$URL_UP")
-        fi
+        CADDY_API_URLS_NEW+=("$URL_UP")
     done
 
-    CADDY_API_URLS=("${CADDY_API_URLS_NEW[@]}")
+    CADDY_API_URLS=($(printf "%s\n" "${CADDY_API_URLS_NEW[@]}" | sort -u))
     export CADDY_API_URLS
+
 }
 
 if [ ! -d /etc/glb ]; then
@@ -229,10 +233,10 @@ for conf in /etc/glb/*.conf; do
     if [[ "$NO_DYNAMIC_API_URLS" -ne 1 ]]; then
         debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
         adjust_api_urls
-        debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
+        debug "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
     fi
 
-    for URL_UP in "${CADDY_API_URLS[@]}"; do
+    for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
         URL="${URL_UP#*@}"
         USERNAME_PASSWORD="${URL_UP%%@*}"
         for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
@@ -243,7 +247,7 @@ for conf in /etc/glb/*.conf; do
         done
     done
     
-    for i in CADDY_API_URLS CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS; do
+    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS; do
         unset $i
     done
 
