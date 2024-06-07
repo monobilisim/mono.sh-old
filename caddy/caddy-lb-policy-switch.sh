@@ -2,7 +2,7 @@
 ###~ description: Switch the load balancing policy of a Caddy server
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
-    echo "v0.1.0" 
+    echo "v0.2.0" 
     exit 0 
 fi
 
@@ -72,7 +72,7 @@ function identify_request() {
 function change_upstreams() {
     echo "Changing upstreams"
     
-    if [[ "$NO_CHANGES_COUNTER" -ge "$NO_CHANGES_EXIT_THRESHOLD" ]]; then
+    if [[ "$NO_CHANGES_COUNTER" -ge "${NO_CHANGES_EXIT_THRESHOLD:-3}" ]]; then
         echo "No changes needed for $NO_CHANGES_EXIT_THRESHOLD times, exiting"
         exit 0
     fi
@@ -165,7 +165,7 @@ for conf in /etc/glb/*.conf; do
     #shellcheck disable=SC1090
     . "$conf"
     
-    for i in CADDY_API_URLS CADDY_SERVERS NO_CHANGES_EXIT_THRESHOLD; do
+    for i in CADDY_API_URLS CADDY_SERVERS; do
         if [ -z "${!i}" ]; then
             echo "$i is not defined on $conf"
             exit 1
