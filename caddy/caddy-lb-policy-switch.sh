@@ -220,10 +220,12 @@ for conf in /etc/glb/*.conf; do
             exit 1
         fi
     done
-
-    debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
-    adjust_api_urls
-    debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
+    
+    if [[ "$NO_DYNAMIC_API_URLS" -ne 1 ]]; then
+        debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
+        adjust_api_urls
+        debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
+    fi
 
     for URL_UP in "${CADDY_API_URLS[@]}"; do
         URL="${URL_UP#*@}"
