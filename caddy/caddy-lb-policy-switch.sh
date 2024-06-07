@@ -214,12 +214,17 @@ for conf in /etc/glb/*.conf; do
     echo "---------------------------------"
     echo "Config: $conf"
 
-    for i in CADDY_API_URLS CADDY_SERVERS CADDY_LB_URLS; do
-        if [ ${#i[@]} -eq 0 ]; then
+    for i in CADDY_API_URLS CADDY_SERVERS; do
+        if [[ ${#i[@]} -eq 0 ]]; then
             echo "$i is empty, please define it on $conf"
             exit 1
         fi
     done
+        
+    if [[ ${#CADDY_LB_URLS[@]} -eq 0 ]] && [[ $NO_DYNAMIC_API_URLS -ne 1 ]]; then
+        echo "CADDY_LB_URLS is empty, please define it on $conf"
+        exit 1
+    fi
     
     if [[ "$NO_DYNAMIC_API_URLS" -ne 1 ]]; then
         debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
