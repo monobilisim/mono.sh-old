@@ -2,7 +2,7 @@
 ###~ description: Switch the load balancing policy of a Caddy server
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
-    echo "v0.2.0" 
+    echo "v0.3.0" 
     exit 0 
 fi
 
@@ -10,6 +10,27 @@ function debug() {
     if [[ "$DEBUG" -eq 1 ]]; then
         echo "debug: $1"
     fi
+}
+
+function hostname_to_url() {
+    local hostname="$1"
+
+    # Split the hostname into parts
+    IFS='-' read -ra parts <<< "$hostname"
+
+    # Check if we have enough parts
+    if (( ${#parts[@]} < 3 )); then
+        echo "Error: Invalid hostname format" >&2
+        return 1
+    fi
+
+    # Extract the relevant parts
+    local domain_part="${parts[0]}"
+    local env_part="${parts[1]}" 
+    local lb_part="${parts[2]}" 
+
+    # Construct the URL
+    echo "https://api.${lb_part}.${env_part}.${domain_part}.biz.tr" 
 }
 
 function alarm() {
@@ -154,6 +175,31 @@ function change_upstreams() {
     esac
 }
 
+function adjust_api_urls() {
+    CADDY_API_URLS_NEW=()
+    for URL_UP in "${CADDY_API_URLS[@]}"; do
+        URL="${URL_UP#*@}"
+        USERNAME_PASSWORD="${URL_UP%%@*}"
+        for i in "${CADDY_LB_URLS[@]}"; do
+            url_new="$(hostname_to_url "$(curl -s "$i" | grep "Hostname:" | awk '{print $2}')")"
+            if [[ "$url_new" == "$URL" ]]; then
+                debug "$url_new is the same as URL, adding to CADDY_API_URLS_NEW"
+                CADDY_API_URLS_NEW+=("$URL_UP") # Make sure the ones that respond first are added first
+                debug "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
+            fi
+        done
+    done
+
+    for URL_UP in "${CADDY_API_URLS[@]}"; do
+        if [[ ! " ${CADDY_API_URLS_NEW[@]} " =~ " ${URL_UP} " ]]; then
+            CADDY_API_URLS_NEW+=("$URL_UP")
+        fi
+    done
+
+    CADDY_API_URLS=("${CADDY_API_URLS_NEW[@]}")
+    export CADDY_API_URLS
+}
+
 if [ ! -d /etc/glb ]; then
     echo "No configuration files found on /etc/glb"
     exit 1
@@ -165,26 +211,19 @@ for conf in /etc/glb/*.conf; do
     #shellcheck disable=SC1090
     . "$conf"
     
-    for i in CADDY_API_URLS CADDY_SERVERS; do
-        if [ -z "${!i}" ]; then
-            echo "$i is not defined on $conf"
-            exit 1
-        fi
-    done
-    
     echo "---------------------------------"
     echo "Config: $conf"
 
-    if [ ${#CADDY_API_URLS[@]} -eq 0 ]; then
-        echo "CADDY_API_URLS is empty, please define it on $conf"
-        exit 1
-    fi
+    for i in CADDY_API_URLS CADDY_SERVERS CADDY_LB_URLS; do
+        if [ ${#i[@]} -eq 0 ]; then
+            echo "$i is empty, please define it on $conf"
+            exit 1
+        fi
+    done
 
-    if [ ${#CADDY_SERVERS[@]} -eq 0 ]; then
-        echo "CADDY_SERVERS is empty, please define it on $conf"
-        exit 1
-    fi
-
+    debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
+    adjust_api_urls
+    debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
 
     for URL_UP in "${CADDY_API_URLS[@]}"; do
         URL="${URL_UP#*@}"
