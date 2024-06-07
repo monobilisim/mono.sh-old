@@ -71,6 +71,12 @@ function identify_request() {
 
 function change_upstreams() {
     echo "Changing upstreams"
+    
+    if [[ "$NO_CHANGES_COUNTER" -ge "$NO_CHANGES_EXIT_THRESHOLD" ]]; then
+        echo "No changes needed for $NO_CHANGES_EXIT_THRESHOLD times, exiting"
+        exit 0
+    fi
+
     case $1 in
         first)
             REQ_TO_SEND="$(echo "$REQ" | jq --arg SRVNAME "$2" -cMr '
@@ -94,6 +100,8 @@ function change_upstreams() {
 
             if [[ "$REQ_TO_SEND" == "$REQ" ]]; then
                 echo "No changes needed as the upstreams are already in the first_$2 order"
+                NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
+                export NO_CHANGES_COUNTER
                 if [[ "$VERBOSE" -eq 1 ]]; then
                     alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the first_$2 order"
                 fi
@@ -122,9 +130,10 @@ function change_upstreams() {
                   )
                 )
                 ')"
-
             if [[ "$REQ_TO_SEND" == "$REQ" ]]; then
                 echo "No changes needed as the upstreams are already in the $1 order"
+                NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
+                export NO_CHANGES_COUNTER
                 if [[ "$VERBOSE" -eq 1 ]]; then
                     alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the $1 order"
                 fi
@@ -156,6 +165,13 @@ for conf in /etc/glb/*.conf; do
     #shellcheck disable=SC1090
     . "$conf"
     
+    for i in CADDY_API_URLS CADDY_SERVERS NO_CHANGES_EXIT_THRESHOLD; do
+        if [ -z "${!i}" ]; then
+            echo "$i is not defined on $conf"
+            exit 1
+        fi
+    done
+    
     echo "---------------------------------"
     echo "Config: $conf"
 
@@ -181,7 +197,7 @@ for conf in /etc/glb/*.conf; do
         done
     done
     
-    for i in CADDY_API_URLS CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM; do
+    for i in CADDY_API_URLS CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD; do
         unset $i
     done
 
