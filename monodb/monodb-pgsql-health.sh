@@ -28,7 +28,7 @@ if [ -z "$(command -v yq)" ]; then
 
     case $yn in
     [Yy]*)
-        curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64')" --output /usr/local/bin/yq
+        curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64' | grep -v 'tar.gz')" --output /usr/local/bin/yq
         chmod +x /usr/local/bin/yq
         ;;
     [Nn]*)
