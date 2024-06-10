@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of PostgreSQL and Patroni cluster
-VERSION=v0.9.1
+VERSION=v0.10.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -21,9 +21,9 @@ if [ -z "$(command -v yq)" ]; then
     read -r -p "Couldn't find yq. Do you want to download it and put it under /usr/local/bin? [y/n]: " yn
     case $yn in
     [Yy]*)
-	curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64')" --output /usr/local/bin/yq
-	chmod +x /usr/local/bin/yq
-	;;
+        curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64')" --output /usr/local/bin/yq
+        chmod +x /usr/local/bin/yq
+        ;;
     [Nn]*)
         echo "Aborted"
         exit 1
@@ -222,6 +222,20 @@ function pgsql_uptime() {
     fi
 }
 
+function check_active_connections() {
+    echo_status "Active Connections"
+    max_and_used=$(su - postgres -c "psql -c \"SELECT max_conn, used FROM (SELECT COUNT(*) used FROM pg_stat_activity) t1, (SELECT setting::int max_conn FROM pg_settings WHERE name='max_connections') t2;\"" | awk 'NR==3')
+    max_conn="$(echo "$max_and_used" | awk '{print $1}')"
+    used_conn="$(echo "$max_and_used" | awk '{print $3}')"
+    if eval "$(echo "$max_conn $used_conn" | awk '{if ($2 >= $1 * 0.9) print "true"; else print "false"}')"; then
+        alarm_check_down "activeconn" "Number of Active Connections $used_conn and Above %90"
+        print_colour "Number of Active Connections" "$used_conn and Above %90" "error"
+    else
+        alarm_check_up "activeconn" "Number of Active Connections $used_conn and Below %90"
+        print_colour "Number of Active Connections" "$used_conn and Below %90"
+    fi
+}
+
 function patroni_status() {
     echo_status "Patroni Status"
     if systemctl status patroni.service >/dev/null; then
@@ -310,6 +324,8 @@ function main() {
     postgresql_status
     printf '\n'
     pgsql_uptime
+    printf '\n'
+    check_active_connections
     if [[ -n "$PATRONI_API" ]]; then
         printf '\n'
         patroni_status
