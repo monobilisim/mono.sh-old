@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v3.3.9"
+script_version="v4.3.9"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -42,7 +42,7 @@ check_config_file() {
         exit 1
     }
     . "$@"
-    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT WEBHOOK_URL REDMINE_URL REDMINE_API_KEY)
+    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT ALARM_WEBHOOK_URL REDMINE_URL REDMINE_API_KEY)
     for var in "${required_vars[@]}"; do
         [[ -z "${!var}" ]] && {
             echo "Variable \"$var\" is not set in \"$@\". exiting..."
@@ -54,7 +54,7 @@ check_config_file() {
 
 function alarm() {
     if [ -z "$ALARM_WEBHOOK_URLS" ]; then
-        curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$WEBHOOK_URL" 1>/dev/null
+        curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
     else
         for webhook in "${ALARM_WEBHOOK_URLS[@]}"; do
             curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$webhook" 1>/dev/null
@@ -112,7 +112,7 @@ function alarm_check_down() {
     }
     service_name=${1//\//-}
     file_path="/tmp/monocloud-health/monocloud_${service_name}_status.txt"
-    [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
+    [[ -n "$IDENTIFIER" ]] && alarm_hostname=$IDENTIFIER || alarm_hostname="$(hostname)"
 
     if [ -z $3 ]; then
         if [ -f "${file_path}" ]; then
@@ -159,7 +159,7 @@ function alarm_check_up() {
     }
     service_name=${1//\//-}
     file_path="/tmp/monocloud-health/monocloud_${service_name}_status.txt"
-    [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
+    [[ -n "$IDENTIFIER" ]] && alarm_hostname=$IDENTIFIER || alarm_hostname="$(hostname)"
 
     # delete_time_diff "$1"
     if [ -f "${file_path}" ]; then
@@ -434,7 +434,7 @@ print_colour() {
 report_status() {
     local diskstatus="$(check_partitions)"
     [[ "${SYSTEM_LOAD_AND_RAM:-1}" -eq 1 ]] && local systemstatus="$(check_system_load_and_ram)"
-    [[ -n "$SERVER_NICK" ]] && alarm_hostname=$SERVER_NICK || alarm_hostname="$(hostname)"
+    [[ -n "$IDENTIFIER" ]] && alarm_hostname=$IDENTIFIER || alarm_hostname="$(hostname)"
 
     local underthreshold_disk=0
     local REDMINE_CLOSE=1
@@ -532,7 +532,7 @@ report_status() {
 	    if [ "${REDMINE_ENABLE:-1}" == "1" ]; then
 		    if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
 
-		        curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"${REDMINE_PROJECT_ID:-$(echo $SERVER_NICK | cut -d '-' -f 1)}\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} üstüne çıktı\", \"description\": \"$table_md\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
+		        curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"${REDMINE_PROJECT_ID:-$(echo $IDENTIFIER | cut -d '-' -f 1)}\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} üstüne çıktı\", \"description\": \"$table_md\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
 		        echo "$"
 		        jq -r '.issue.id' /tmp/monocloud-health/redmine.json > /tmp/monocloud-health/redmine_issue_id
 		        rm -f /tmp/monocloud-health/redmine.json
@@ -542,7 +542,7 @@ report_status() {
 		    message="Redmine issue: $REDMINE_URL/issues/$(cat /tmp/monocloud-health/redmine_issue_id)"
         fi
         message+="\n\`\`\`\"}"
-	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL"
+	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$ALARM_WEBHOOK_URL"
 	else
 	    echo "There's no alarm for Overthreshold (DISK) today..."
 	fi
@@ -567,7 +567,7 @@ validate() {
         [[ ! -e "$(command -v $a)" ]] && missing_apps+="$a, "
     done
     [[ -n "$missing_apps" ]] && { echo -e "${c_red}[ FAIL ] Please install this apps before proceeding: (${missing_apps%, })"; } || { echo -e "${c_green}[  OK  ] Required apps are already installed."; }
-    curl -fsSL $(echo $WEBHOOK_URL | grep_custom -o '(?<=\:\/\/)(([a-z]|\.)+)') &>/dev/null
+    curl -fsSL $(echo $ALARM_WEBHOOK_URL | grep_custom -o '(?<=\:\/\/)(([a-z]|\.)+)') &>/dev/null
     [[ ! "$?" -eq "0" ]] && { echo -e "${c_red}[ FAIL ] Webhook URL is not reachable."; } || { echo -e "${c_green}[  OK  ] Webhook URL is reachable."; }
     touch /tmp/monocloud-health/.testing
     [[ ! "$?" -eq "0" ]] && { echo -e "${c_red}[ FAIL ] /tmp/monocloud-health is not writable."; } || { echo -e "${c_green}[  OK  ] /tmp/monocloud-health is writable."; }
