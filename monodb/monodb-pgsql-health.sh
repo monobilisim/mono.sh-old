@@ -18,7 +18,14 @@ fi
 
 # https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
 if [ -z "$(command -v yq)" ]; then
-    read -r -p "Couldn't find yq. Do you want to download it and put it under /usr/local/bin? [y/n]: " yn
+    
+    if [[ "$CRON" == "1" ]]; then
+        echo "Couldn't find yq. Installing it..."
+        yn="y"
+    else
+        read -r -p "Couldn't find yq. Do you want to download it and put it under /usr/local/bin? [y/n]: " yn
+    fi
+
     case $yn in
     [Yy]*)
         curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64')" --output /usr/local/bin/yq
