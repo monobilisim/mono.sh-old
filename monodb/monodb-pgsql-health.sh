@@ -18,7 +18,7 @@ fi
 
 # https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
 if [ -z "$(command -v yq)" ]; then
-    
+
     if [[ "$1" == "--yq" ]]; then
         echo "Couldn't find yq. Installing it..."
         yn="y"
@@ -231,18 +231,42 @@ function pgsql_uptime() {
 
 function check_active_connections() {
     echo_status "Active Connections"
+    if grep iasdb /etc/passwd &>/dev/null; then
+        return #TODO
+    elif grep gitlab-psql /etc/passwd &>/dev/null; then
+        return #TODO
+    fi
+
     max_and_used=$(su - postgres -c "psql -c \"SELECT max_conn, used FROM (SELECT COUNT(*) used FROM pg_stat_activity) t1, (SELECT setting::int max_conn FROM pg_settings WHERE name='max_connections') t2;\"" | awk 'NR==3')
     max_conn="$(echo "$max_and_used" | awk '{print $1}')"
     used_conn="$(echo "$max_and_used" | awk '{print $3}')"
     if eval "$(echo "$max_conn $used_conn" | awk '{if ($2 >= $1 * 0.9) print "true"; else print "false"}')"; then
-        alarm_check_down "activeconn" "Number of Active Connections $used_conn and Above %90"
+        alarm_check_down "active_conn" "Number of Active Connections is $used_conn and Above %90"
         print_colour "Number of Active Connections" "$used_conn and Above %90" "error"
     else
-        alarm_check_up "activeconn" "Number of Active Connections $used_conn and Below %90"
+        alarm_check_up "active_conn" "Number of Active Connections is $used_conn and Below %90"
         print_colour "Number of Active Connections" "$used_conn and Below %90"
     fi
 }
 
+function check_running_queries() {
+    echo_status "Active Queries"
+    if grep iasdb /etc/passwd &>/dev/null; then
+        return #TODO
+    elif grep gitlab-psql /etc/passwd &>/dev/null; then
+        return #TODO
+    fi
+
+    # SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';
+    queries=$(su - postgres -c "psql -c \"SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';\"" | awk 'NR==3')
+    if [[ "$queries" -gt "$QUERY_LIMIT" ]]; then
+        alarm_check_down "query_limit" "Number of Active Queries is $queries/$QUERY_LIMIT"
+        print_colour "Number of Active Queries" "$queries/$QUERY_LIMIT" "error"
+    else
+        alarm_check_up "query_limit" "Number of Active Queries is $queries/$QUERY_LIMIT"
+        print_colour "Number of Active Queries" "$queries/$QUERY_LIMIT"
+    fi
+}
 function patroni_status() {
     echo_status "Patroni Status"
     if systemctl status patroni.service >/dev/null; then
@@ -333,6 +357,8 @@ function main() {
     pgsql_uptime
     printf '\n'
     check_active_connections
+    printf '\n'
+    check_running_queries
     if [[ -n "$PATRONI_API" ]]; then
         printf '\n'
         patroni_status
