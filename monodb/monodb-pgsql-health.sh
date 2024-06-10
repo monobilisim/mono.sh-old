@@ -19,7 +19,7 @@ fi
 # https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
 if [ -z "$(command -v yq)" ]; then
     
-    if [[ "$CRON" == "1" ]]; then
+    if [[ "$1" == "--yq" ]]; then
         echo "Couldn't find yq. Installing it..."
         yn="y"
     else
