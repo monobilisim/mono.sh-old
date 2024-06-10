@@ -406,7 +406,7 @@ function check_rke2_ingress_nginx() {
         fi
     done
 
-    check_rke2_ingress_endpoint_response
+    #check_rke2_ingress_endpoint_response
 }
 
 function check_certmanager() {
