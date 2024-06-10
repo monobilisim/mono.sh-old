@@ -2,7 +2,7 @@
 ###~ description: Switch the load balancing policy of a Caddy server
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
-    echo "v0.3.0" 
+    echo "v0.4.0" 
     exit 0 
 fi
 
@@ -119,7 +119,7 @@ function change_upstreams() {
                 )
                 ')"
 
-            if [[ "$REQ_TO_SEND" == "$REQ" ]]; then
+            if [[ "$REQ_TO_SEND" == "$REQ" ]] && [[ "$SERVER_OVERRIDE_CONFIG" != "1" ]]; then
                 echo "No changes needed as the upstreams are already in the first_$2 order"
                 NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
                 export NO_CHANGES_COUNTER
@@ -151,7 +151,7 @@ function change_upstreams() {
                   )
                 )
                 ')"
-            if [[ "$REQ_TO_SEND" == "$REQ" ]]; then
+            if [[ "$REQ_TO_SEND" == "$REQ" ]] && [[ "$SERVER_OVERRIDE_CONFIG" != "1" ]]; then
                 echo "No changes needed as the upstreams are already in the $1 order"
                 NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
                 export NO_CHANGES_COUNTER
@@ -199,7 +199,7 @@ function adjust_api_urls() {
         CADDY_API_URLS_NEW+=("$URL_UP")
     done
 
-    CADDY_API_URLS=($(printf "%s\n" "${CADDY_API_URLS_NEW[@]}" | sort -u))
+    mapfile -t CADDY_API_URLS < <(printf "%s\n" "${CADDY_API_URLS_NEW[@]}" | sort -u)
     export CADDY_API_URLS
 
 }
@@ -235,19 +235,33 @@ for conf in /etc/glb/*.conf; do
         adjust_api_urls
         debug "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
     fi
-
-    for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
-        URL="${URL_UP#*@}"
-        USERNAME_PASSWORD="${URL_UP%%@*}"
-        for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
-            echo '---------------------------------'
-            echo "Checking '$URL_TO_FIND' on '$URL'"
-            identify_request "$1" "$2"
-            echo '---------------------------------'
-        done
-    done
     
-    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS; do
+    if [[ "$LOOP_ORDER" == "SERVERS" ]]; then
+        for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
+            for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
+                URL="${URL_UP#*@}"
+                USERNAME_PASSWORD="${URL_UP%%@*}"
+                echo '---------------------------------'
+                echo "Checking '$URL_TO_FIND' on '$URL'"
+                identify_request "$1" "$2"
+                echo '---------------------------------'
+            done
+        done
+    else
+        for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
+            URL="${URL_UP#*@}"
+            USERNAME_PASSWORD="${URL_UP%%@*}"
+            for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
+                echo '---------------------------------'
+                echo "Checking '$URL_TO_FIND' on '$URL'"
+                identify_request "$1" "$2"
+                echo '---------------------------------'
+            done
+        done
+    fi 
+
+
+    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER; do
         unset $i
     done
 
