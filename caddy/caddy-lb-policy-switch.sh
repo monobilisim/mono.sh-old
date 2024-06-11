@@ -12,6 +12,12 @@ function debug() {
     fi
 }
 
+function verbose() {
+    if [[ "$VERBOSE" -eq 1 ]]; then
+        echo "$1"
+    fi
+}
+
 function hostname_to_url() {
     local hostname="$1"
 
@@ -183,13 +189,13 @@ function adjust_api_urls() {
    
             URL="${URL_UP#*@}"
             USERNAME_PASSWORD="${URL_UP%%@*}"
-        
-            debug "LB $i"
+            
+            verbose "LB $i"
             url_new="$(hostname_to_url "$(curl -s "$i" | grep "Hostname:" | awk '{print $2}')")"
             if [[ "$url_new" == "$URL" ]]; then
                 debug "$url_new is the same as URL, adding to CADDY_API_URLS_NEW"
                 CADDY_API_URLS_NEW+=("$URL_UP") # Make sure the ones that respond first are added first
-                debug "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
+                verbose "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
             fi
         done
     
@@ -261,7 +267,7 @@ for conf in /etc/glb/*.conf; do
     fi 
 
 
-    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER; do
+    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG; do
         unset $i
     done
 
