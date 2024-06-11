@@ -1,7 +1,7 @@
 #!/bin/bash
 ###~ description: Checks the status of postal and related services
 
-VERSION=v1.0.3
+VERSION=v1.1.0
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -292,24 +292,26 @@ fnMessageQueue() {
 
 fnMessageHeld() {
     echo_status "Held Messages:"
-    postal_servers=("$(mysql -h"$message_db_host" -P"$message_db_port" -u"$message_db_user" -p"$message_db_pass" -sNe "select id from postal.servers;" | sort -n)")
-    for i in ${postal_servers[@]}; do
-        variable="postal-server-$i"
+    readarray -t postal_servers <<< "$(mysql -h"$message_db_host" -P"$message_db_port" -u"$message_db_user" -p"$message_db_pass" -sNe "select id, permalink from postal.servers;" | sort -n)"
+    for i in "${postal_servers[@]}"; do
+        id=$(echo "$i" | awk '{print $1}')
+        name=$(echo "$i" | awk '{print $2}')
+        variable="postal-server-$id"
         if ! db_message_held=$(mysql -h"$message_db_host" -P"$message_db_port" -u"$message_db_user" -p"$message_db_pass" -sNe "USE $variable; SELECT COUNT(id) FROM messages WHERE status = 'Held';" 2>&1); then
-            alarm_check_down "status_$variable" "Couldn't retrieve information of held messages for $variable from message_db at host $message_db_host with the parameters on $postal_config at $IDENTIFIER"
+            alarm_check_down "status_$variable" "Couldn't retrieve information of held messages for $name ($variable) from message_db at host $message_db_host with the parameters on $postal_config at $IDENTIFIER"
             db_message_held_error="$db_message_held"
             db_message_held=-1
         else
-            alarm_check_up "status_$variable" "Able to retrieve information of held messages for $variable from message_db at host $message_db_host at $IDENTIFIER"
+            alarm_check_up "status_$variable" "Able to retrieve information of held messages for $name ($variable) from message_db at host $message_db_host at $IDENTIFIER"
         fi
         if [ "$db_message_held" -lt "$held_threshold" ] && ! [ "$db_message_held" -lt 0 ]; then
-            alarm_check_up "$variable" "Number of Held messages of $variable is back to normal - $db_message_held/$held_threshold at $IDENTIFIER"
-            printf "  %-40s %s\n" "${BLUE_FG}$variable${RESET}" "Held messages are smaller than ${GREEN_FG}$held_threshold - Held: $db_message_held${RESET}"
+            alarm_check_up "$variable" "Number of Held messages of $name ($variable) is back to normal - $db_message_held/$held_threshold at $IDENTIFIER"
+            printf "  %-40s %s\n" "${BLUE_FG}$name ($variable)${RESET}" "Held messages are smaller than ${GREEN_FG}$held_threshold - Held: $db_message_held${RESET}"
         elif [ "$db_message_held" -eq -1 ]; then
-            printf "  %-40s %s\n" "${BLUE_FG}$variable${RESET}" "Held messages ${RED_FG}$db_message_held_error${RESET}"
-        else-
-            alarm_check_down "$variable" "Number of Held messages of $variable is above threshold - $db_message_held/$held_threshold at $IDENTIFIER"
-            printf "  %-40s %s\n" "${BLUE_FG}$variable${RESET}" "Held messages are greater than ${RED_FG}$held_threshold - Held: $db_message_held${RESET}"
+            printf "  %-40s %s\n" "${BLUE_FG}$name ($variable)${RESET}" "Held messages ${RED_FG}$db_message_held_error${RESET}"
+        else
+            alarm_check_down "$variable" "Number of Held messages of $name ($variable) is above threshold - $db_message_held/$held_threshold at $IDENTIFIER"
+            printf "  %-40s %s\n" "${BLUE_FG}$name ($variable)${RESET}" "Held messages are greater than ${RED_FG}$held_threshold - Held: $db_message_held${RESET}"
         fi
     done
 }
