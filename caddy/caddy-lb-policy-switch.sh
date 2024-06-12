@@ -64,12 +64,15 @@ function alarm() {
 
 
 function identify_request() {
-    debug "Checking $URL"
+    
+    read IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
+    read ACTUAL_URL < <(awk -F '[@;]' '{print $1}' <<< "$URL")
+    
+    debug "Checking $ACTUAL_URL for $IDENTIFIER"
     debug "Username-Password: $USERNAME_PASSWORD"
 
-
     # Not to be confused with CADDY_SERVERS
-    SERVERS="$(curl -s -u "$USERNAME_PASSWORD" "$URL"/config/apps/http/servers | jq -r 'keys | join(" ")')"
+    SERVERS="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers | jq -r 'keys | join(" ")')"
    
     debug "Servers: $SERVERS"
 
@@ -78,19 +81,19 @@ function identify_request() {
         debug "checking server: $SERVER"
 
         # Identify the routes
-        LENGTH="$(curl -s -u "$USERNAME_PASSWORD" "$URL"/config/apps/http/servers/"${SERVER:?}"/routes | jq length)"
+        LENGTH="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers/"${SERVER:?}"/routes | jq length)"
         
         debug "Routes: $LENGTH"
 
         for route in $(seq 0 $((LENGTH-1))); do
-            REQ_URL="$URL/config/apps/http/servers/${SERVER:?}/routes/$route"
+            REQ_URL="$ACTUAL_URL/config/apps/http/servers/${SERVER:?}/routes/$route"
             REQ="$(curl -u "$USERNAME_PASSWORD" -s "$REQ_URL")"
             export REQ
             export REQ_URL
 
             if (echo "$REQ" | jq -r '.match[].host | join(" ")' 2> /dev/null | grep -qw "$URL_TO_FIND"); then
                 echo "Match found, route: $route, server: $SERVER"
-                change_upstreams "$1" "$2"
+                change_upstreams "$1" "$2" "$IDENTIFIER"
             fi
         done
     done
@@ -102,6 +105,10 @@ function change_upstreams() {
     if [[ "$NO_CHANGES_COUNTER" -ge "${NO_CHANGES_EXIT_THRESHOLD:-3}" ]]; then
         echo "No changes needed for $NO_CHANGES_EXIT_THRESHOLD times, exiting"
         exit 0
+    fi
+
+    if [[ -z "$IDENTIFIER" ]]; then
+        IDENTIFIER="$URL"
     fi
 
     case $1 in
@@ -130,16 +137,16 @@ function change_upstreams() {
                 NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
                 export NO_CHANGES_COUNTER
                 if [[ "$VERBOSE" -eq 1 ]]; then
-                    alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the first_$2 order"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the first_$2 order"
                 fi
                 return
             else
                 echo "Sending request to change upstreams"
                 
                 if curl -u "$USERNAME_PASSWORD" -X PATCH -H "Content-Type: application/json" -d "$REQ_TO_SEND" "$REQ_URL" 2> /tmp/caddy-lb-policy-switch-error.log; then
-                    alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:check:] Switched upstreams to first_$2"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched upstreams to first_$2"
                 else
-                    alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to first_$2\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to first_$2\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
                 fi
 
             fi
@@ -162,15 +169,15 @@ function change_upstreams() {
                 NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
                 export NO_CHANGES_COUNTER
                 if [[ "$VERBOSE" -eq 1 ]]; then
-                    alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the $1 order"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the $1 order"
                 fi
                 return
             else
                 echo "Sending request to change lb_policy to $1"
                 if curl -u "$USERNAME_PASSWORD" -X PATCH -H "Content-Type: application/json" -d "$REQ_TO_SEND" "$REQ_URL" 2> /tmp/caddy-lb-policy-switch-error.log; then
-                    alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:check:] Switched lb_policy to $1"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched lb_policy to $1"
                 else
-                    alarm "[Caddy lb-policy Switch] [$URL] [$URL_TO_FIND] [:red_circle:] Failed to switch lb_policy to $1\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch lb_policy to $1\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
                 fi
             fi
             ;;
