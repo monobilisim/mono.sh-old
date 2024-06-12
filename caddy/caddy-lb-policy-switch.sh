@@ -3,7 +3,7 @@
 start=`date +%s`
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
-    echo "v0.4.0" 
+    echo "v0.5.0" 
     exit 0 
 fi
 
@@ -90,9 +90,11 @@ function identify_request() {
     
     debug "Checking $ACTUAL_URL for $IDENTIFIER"
     debug "Username-Password: $USERNAME_PASSWORD"
+    
+    FULL_REQ="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers)"
 
     # Not to be confused with CADDY_SERVERS
-    SERVERS="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers | jq -r 'keys | join(" ")')"
+    SERVERS="$(echo "$FULL_REQ" | jq -r 'keys | join(" ")')"
    
     debug "Servers: $SERVERS"
 
@@ -113,7 +115,7 @@ function identify_request() {
 
             if (echo "$REQ" | jq -r '.match[].host | join(" ")' 2> /dev/null | grep -qw "$URL_TO_FIND"); then
                 echo "Match found, route: $route, server: $SERVER"
-                change_upstreams "$1" "$2" "$IDENTIFIER"
+                #change_upstreams "$1" "$2" "$IDENTIFIER"
             fi
         done
     done
@@ -132,8 +134,9 @@ function change_upstreams() {
     fi
 
     case $1 in
-        first)
-            REQ_TO_SEND="$(echo "$REQ" | jq --arg SRVNAME "$2" -cMr '
+        first_dc1 | first_dc2)
+            IFS='_' read -r first second <<< "$1"
+            REQ_TO_SEND="$(echo "$REQ" | jq --arg SRVNAME "$second" -cMr '
                 .handle[] |= (
                   .routes[] |= (
                     .handle[] |= (
@@ -153,20 +156,20 @@ function change_upstreams() {
                 ')"
 
             if [[ "$REQ_TO_SEND" == "$REQ" ]] && [[ "$SERVER_OVERRIDE_CONFIG" != "1" ]]; then
-                echo "No changes needed as the upstreams are already in the first_$2 order"
+                echo "No changes needed as the upstreams are already in the $1 order"
                 NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
                 export NO_CHANGES_COUNTER
                 if [[ "$VERBOSE" -eq 1 ]]; then
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the first_$2 order"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the $1 order"
                 fi
                 return
             else
                 echo "Sending request to change upstreams"
                 
                 if curl -u "$USERNAME_PASSWORD" -X PATCH -H "Content-Type: application/json" -d "$REQ_TO_SEND" "$REQ_URL" 2> /tmp/caddy-lb-policy-switch-error.log; then
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched upstreams to first_$2"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched upstreams to $1"
                 else
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to first_$2\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to $1\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
                 fi
 
             fi
