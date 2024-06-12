@@ -42,6 +42,10 @@ if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
 fi
 
+if [ -z "$PATRONI_API" ] && [ -f /etc/patroni/patroni.yml ]; then
+    PATRONI_API="$(yq -r .restapi.listen /etc/patroni/patroni.yml)"
+fi
+
 RED_FG=$(tput setaf 1)
 GREEN_FG=$(tput setaf 2)
 BLUE_FG=$(tput setaf 4)
@@ -271,7 +275,7 @@ function check_running_queries() {
         print_colour "Number of Active Queries" "$queries/$QUERY_LIMIT"
     fi
 }
-function patroni_status() {
+function cluster_status() {
     echo_status "Patroni Status"
     if systemctl status patroni.service >/dev/null; then
         print_colour "Patroni" "Active"
@@ -280,25 +284,29 @@ function patroni_status() {
         print_colour "Patroni" "Active" "error"
         alarm_check_down "patroni" "Patroni is not active!"
     fi
-}
 
-function cluster_role() {
-    echo_status "Cluster Roles"
-    if ! curl -s "$PATRONI_API" >/dev/null; then
+    CLUSTER_URL="$PATRONI_API/cluster"
+    if ! curl -s "$CLUSTER_URL" >/dev/null; then
         print_colour "Patroni API" "not accessible" "error"
-        alarm_check_down "patroni_api" "Can't access Patroni API through: $PATRONI_API"
+        alarm_check_down "patroni_api" "Can't access Patroni API through: $CLUSTER_URL"
         return
     fi
-    alarm_check_up "patroni_api" "Patroni API is accessible again through: $PATRONI_API"
-    output=$(curl -s "$PATRONI_API")
+    alarm_check_up "patroni_api" "Patroni API is accessible again through: $CLUSTER_URL"
+
+    output=$(curl -s "$CLUSTER_URL")
     mapfile -t cluster_names < <(echo "$output" | jq -r '.members[] | .name ')
     mapfile -t cluster_roles < <(echo "$output" | jq -r '.members[] | .role')
+    mapfile -t cluster_states < <(curl -s "$CLUSTER_URL" | jq -r '.members[] | .state')
+    name=$(curl -s "$PATRONI_API" | jq -r .patroni.name)
+    this_node=$(curl -s "$CLUSTER_URL" | jq -r --arg name "$name" '.members[] | select(.name==$name) | .role')
+    print_colour "This node" "$this_node"
+
+    printf '\n'
+    echo_status "Cluster Roles"
     i=0
     for cluster in "${cluster_names[@]}"; do
         print_colour "$cluster" "${cluster_roles[$i]}"
-        if
-            [ -f /tmp/monodb-pgsql-health/raw_output.json ]
-        then
+        if [ -f /tmp/monodb-pgsql-health/raw_output.json ]; then
             old_role="$(jq -r '.members['"$i"'] | .role' </tmp/monodb-pgsql-health/raw_output.json)"
             if [ "${cluster_roles[$i]}" != "$old_role" ] &&
                 [ "$cluster" == "$(jq -r '.members['"$i"'] | .name' </tmp/monodb-pgsql-health/raw_output.json)" ]; then
@@ -309,8 +317,7 @@ function cluster_role() {
                 if [ "${cluster_roles[$i]}" == "leader" ]; then
                     alarm "[Patroni - $IDENTIFIER] [:check:] New leader is $cluster!"
                     if [[ -n "$LEADER_SWITCH_HOOK" ]] && [[ -f "/etc/patroni/patroni.yml" ]]; then
-                        IP_PATRONI="$(cat /etc/patroni/patroni.yml | yq -r .restapi.listen)"
-                        if [[ "$(curl "$IP_PATRONI" | jq -r .role)" == "master" ]]; then
+                        if [[ "$(curl "$CLUSTER_URL" | jq -r .role)" == "master" ]]; then
                             eval "$LEADER_SWITCH_HOOK"
                             EXIT_CODE=$?
                             if [ $? -eq 0 ]; then
@@ -327,18 +334,9 @@ function cluster_role() {
         i=$((i + 1))
     done
     echo "$output" | jq >/tmp/monodb-pgsql-health/raw_output.json
-}
 
-function cluster_state() {
+    printf '\n'
     echo_status "Cluster States"
-    if ! curl -s "$PATRONI_API" >/dev/null; then
-        print_colour "Patroni API" "not accessible" "error"
-        alarm_check_down "patroni_api" "Can't access Patroni API through: $PATRONI_API"
-        return
-    fi
-    alarm_check_up "patroni_api" "Patroni API is accessible again through: $PATRONI_API"
-    mapfile -t cluster_names < <(curl -s "$PATRONI_API" | jq -r '.members[] | .name ')
-    mapfile -t cluster_states < <(curl -s "$PATRONI_API" | jq -r '.members[] | .state')
     i=0
     for cluster in "${cluster_names[@]}"; do
         if [ "${cluster_states[$i]}" == "running" ] || [ "${cluster_states[$i]}" == "streaming" ]; then
@@ -365,11 +363,7 @@ function main() {
     check_running_queries
     if [[ -n "$PATRONI_API" ]]; then
         printf '\n'
-        patroni_status
-        printf '\n'
-        cluster_role
-        printf '\n'
-        cluster_state
+        cluster_status
     fi
 }
 
