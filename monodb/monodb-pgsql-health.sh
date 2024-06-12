@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of PostgreSQL and Patroni cluster
-VERSION=v0.10.0
+VERSION=v1.0.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
