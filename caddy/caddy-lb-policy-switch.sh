@@ -88,6 +88,7 @@ function identify_request() {
     read IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
     read ACTUAL_URL < <(awk -F '[@;]' '{print $1}' <<< "$URL")
     
+    export ACTUAL_URL
     debug "Checking $ACTUAL_URL for $IDENTIFIER"
     debug "Username-Password: $USERNAME_PASSWORD"
     
@@ -109,10 +110,25 @@ function identify_request() {
                     and 
                     (.handle[].routes[].handle[].upstreams != null) 
                   )' /tmp/caddy-lb-policy-switch.json)"
+        
+        ROUTE_ID="$(jq --arg domain "$URL_TO_FIND" --arg server "$SERVER" -n '
+    input
+        | .[$server].routes
+        | to_entries[]
+        | select(
+              (.value.match[] | (.host | index($domain)) != null) 
+              and 
+              (.value.handle[].routes[].handle[].upstreams != null)
+          )
+        | .key
+' /tmp/caddy-lb-policy-switch.json)"
+
+        export REQ
+        export ROUTE_ID
 
         if [[ -n "$REQ" ]]; then
             debug "REQ: $REQ"
-            change_upstreams "$1" "$2" "$IDENTIFIER"
+            change_upstreams "$1" "$2" "$IDENTIFIER" "$SERVER"
         fi 
     done
     rm -f /tmp/caddy-lb-policy-switch.json
@@ -129,6 +145,10 @@ function change_upstreams() {
     if [[ -z "$IDENTIFIER" ]]; then
         IDENTIFIER="$URL"
     fi
+
+    REQ_URL="$ACTUAL_URL"/config/apps/http/servers/"$4"/routes/"$ROUTE_ID"
+
+    debug "REQ_URL: $REQ_URL"
 
     case $1 in
         first_dc1 | first_dc2)
@@ -151,6 +171,8 @@ function change_upstreams() {
                   )
                 )
                 ')"
+
+            debug "REQ_TO_SEND: $REQ_TO_SEND"
 
             if [[ "$REQ_TO_SEND" == "$REQ" ]] && [[ "$SERVER_OVERRIDE_CONFIG" != "1" ]]; then
                 echo "No changes needed as the upstreams are already in the $1 order"
