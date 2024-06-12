@@ -32,7 +32,7 @@ function remove_password() {
 
     for i in "${url[@]}"; do
         
-        CENSORED_CADDY_API_URLS+=("${i#*@}")
+        CENSORED_CADDY_API_URLS+=("${i#*;}")
     done
 
     export CENSORED_CADDY_API_URLS
@@ -221,12 +221,11 @@ function adjust_api_urls() {
             URL="${URL_UP#*@}"
             USERNAME_PASSWORD="${URL_UP%%@*}"
             
-            verbose "LB $i"
+            debug "LB $i"
             url_new="$(hostname_to_url "$(curl -s "$i" | grep "Hostname:" | awk '{print $2}')")"
             if [[ "$url_new" == "$URL" ]]; then
                 debug "$url_new is the same as URL, adding to CADDY_API_URLS_NEW"
                 CADDY_API_URLS_NEW+=("$URL_UP") # Make sure the ones that respond first are added first
-                verbose "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
             fi
         done
     
