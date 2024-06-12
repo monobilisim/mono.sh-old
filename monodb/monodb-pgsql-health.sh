@@ -232,12 +232,14 @@ function pgsql_uptime() {
 function check_active_connections() {
     echo_status "Active Connections"
     if grep iasdb /etc/passwd &>/dev/null; then
-        return #TODO
+        max_and_used=$(su - iasdb -c "psql -c \"SELECT max_conn, used FROM (SELECT COUNT(*) used FROM pg_stat_activity) t1, (SELECT setting::int max_conn FROM pg_settings WHERE name='max_connections') t2;\"" | awk 'NR==3')
     elif grep gitlab-psql /etc/passwd &>/dev/null; then
-        return #TODO
+        max_and_used=$(gitlab-psql -c "SELECT max_conn, used FROM (SELECT COUNT(*) used FROM pg_stat_activity) t1, (SELECT setting::int max_conn FROM pg_settings WHERE name='max_connections') t2;" | awk 'NR==3')
+    else
+        max_and_used=$(su - postgres -c "psql -c \"SELECT max_conn, used FROM (SELECT COUNT(*) used FROM pg_stat_activity) t1, (SELECT setting::int max_conn FROM pg_settings WHERE name='max_connections') t2;\"" | awk 'NR==3')
+
     fi
 
-    max_and_used=$(su - postgres -c "psql -c \"SELECT max_conn, used FROM (SELECT COUNT(*) used FROM pg_stat_activity) t1, (SELECT setting::int max_conn FROM pg_settings WHERE name='max_connections') t2;\"" | awk 'NR==3')
     max_conn="$(echo "$max_and_used" | awk '{print $1}')"
     used_conn="$(echo "$max_and_used" | awk '{print $3}')"
     if eval "$(echo "$max_conn $used_conn" | awk '{if ($2 >= $1 * 0.9) print "true"; else print "false"}')"; then
@@ -252,13 +254,15 @@ function check_active_connections() {
 function check_running_queries() {
     echo_status "Active Queries"
     if grep iasdb /etc/passwd &>/dev/null; then
-        return #TODO
+        queries=$(su - iasdb -c "psql -c \"SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';\"" | awk 'NR==3 {print $1}')
     elif grep gitlab-psql /etc/passwd &>/dev/null; then
-        return #TODO
+        queries=$(gitlab-psql -c "SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';" | awk 'NR==3 {print $1}')
+    else
+        queries=$(su - postgres -c "psql -c \"SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';\"" | awk 'NR==3 {print $1}')
+
     fi
 
     # SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';
-    queries=$(su - postgres -c "psql -c \"SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';\"" | awk 'NR==3')
     if [[ "$queries" -gt "$QUERY_LIMIT" ]]; then
         alarm_check_down "query_limit" "Number of Active Queries is $queries/$QUERY_LIMIT"
         print_colour "Number of Active Queries" "$queries/$QUERY_LIMIT" "error"
