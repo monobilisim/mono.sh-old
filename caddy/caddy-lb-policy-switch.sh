@@ -115,7 +115,7 @@ function identify_request() {
 
             if (echo "$REQ" | jq -r '.match[].host | join(" ")' 2> /dev/null | grep -qw "$URL_TO_FIND"); then
                 echo "Match found, route: $route, server: $SERVER"
-                #change_upstreams "$1" "$2" "$IDENTIFIER"
+                change_upstreams "$1" "$2" "$IDENTIFIER"
             fi
         done
     done
