@@ -297,7 +297,7 @@ function cluster_status() {
     mapfile -t cluster_names < <(echo "$output" | jq -r '.members[] | .name ')
     mapfile -t cluster_roles < <(echo "$output" | jq -r '.members[] | .role')
     mapfile -t cluster_states < <(curl -s "$CLUSTER_URL" | jq -r '.members[] | .state')
-    name=$(curl -s "$PATRONI_API" | jq -r .patroni.name)
+    name=$(yq -r .name /etc/patroni/patroni.yml)
     this_node=$(curl -s "$CLUSTER_URL" | jq -r --arg name "$name" '.members[] | select(.name==$name) | .role')
     print_colour "This node" "$this_node"
 
