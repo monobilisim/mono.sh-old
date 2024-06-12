@@ -219,7 +219,7 @@ function pgsql_uptime() {
     fi
 
     if eval "$command" &>/dev/null; then
-        uptime="$(eval $command | awk 'NR==3')"
+        uptime="$(eval $command | awk 'NR==3' | xargs)"
         alarm_check_up "now" "Can run 'SELECT' statements again"
         print_colour "Uptime" "$uptime"
     else
