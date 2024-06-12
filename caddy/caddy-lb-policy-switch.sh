@@ -245,6 +245,11 @@ if [ ! -d /etc/glb ]; then
     exit 1
 fi
 
+if [ -f "/tmp/caddy-lb-policy-switch.json" ]; then
+    echo "Instance of the script is already running"
+    exit
+fi
+
 for conf in /etc/glb/*.conf; do
     [ ! -f "$conf" ] && continue
     
