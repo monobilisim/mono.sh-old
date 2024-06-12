@@ -206,6 +206,9 @@ function change_upstreams() {
             exit 1
             ;;
     esac
+    
+    mkdir -p /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"
+    echo "$1" > /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"/lb_policy
 }
 
 function adjust_api_urls() {
