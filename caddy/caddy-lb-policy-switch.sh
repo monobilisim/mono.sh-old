@@ -187,6 +187,10 @@ function adjust_api_urls() {
     for i in "${CADDY_LB_URLS[@]}"; do
         for URL_UP in "${CADDY_API_URLS[@]}"; do
    
+            if [[ "${#CADDY_API_URLS_NEW[@]}" -eq $((${#CADDY_LB_URLS[@]} - 1)) ]]; then
+                break
+            fi
+
             URL="${URL_UP#*@}"
             USERNAME_PASSWORD="${URL_UP%%@*}"
             
@@ -205,8 +209,8 @@ function adjust_api_urls() {
         CADDY_API_URLS_NEW+=("$URL_UP")
     done
 
-    mapfile -t CADDY_API_URLS < <(printf "%s\n" "${CADDY_API_URLS_NEW[@]}" | sort -u)
-    export CADDY_API_URLS
+    readarray -t CADDY_API_URLS_NEW < <(printf '%s\n' "${CADDY_API_URLS_NEW[@]}" | sort -u)
+    export CADDY_API_URLS_NEW
 
 }
 
