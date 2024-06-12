@@ -122,8 +122,8 @@ function identify_request() {
 function change_upstreams() {
     echo "Changing upstreams"
     
-    if [[ "$NO_CHANGES_COUNTER" -ge "${NO_CHANGES_EXIT_THRESHOLD:-3}" ]]; then
-        echo "No changes needed for $NO_CHANGES_EXIT_THRESHOLD times, exiting"
+    if [[ "$NO_CHANGES_COUNTER" -ge "${SERVER_NOCHANGE_EXIT_THRESHOLD:-3}" ]]; then
+        echo "No changes needed for $SERVER_NOCHANGE_EXIT_THRESHOLD times, exiting"
         exit 0
     fi
 
@@ -266,7 +266,7 @@ for conf in /etc/glb/*.conf; do
         exit 1
     fi
     
-    if [[ "$NO_DYNAMIC_API_URLS" -ne 1 ]]; then
+    if [[ "$DYNAMIC_API_URLS" -ne 0 ]]; then
         remove_password "${CADDY_API_URLS[@]}"
         verbose_alarm "CADDY_API_URLS: ${CENSORED_CADDY_API_URLS[*]}"
         
@@ -302,7 +302,7 @@ for conf in /etc/glb/*.conf; do
     fi 
 
 
-    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG CENSORED_CADDY_API_URLS; do
+    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM SERVER_NOCHANGE_EXIT_THRESHOLD CADDY_LB_URLS DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG CENSORED_CADDY_API_URLS; do
         unset $i
     done
 
