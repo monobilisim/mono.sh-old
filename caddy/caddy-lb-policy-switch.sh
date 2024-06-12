@@ -91,10 +91,10 @@ function identify_request() {
     debug "Checking $ACTUAL_URL for $IDENTIFIER"
     debug "Username-Password: $USERNAME_PASSWORD"
     
-    FULL_REQ="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers)"
+    curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers -o /tmp/caddy-lb-policy-switch.json
 
     # Not to be confused with CADDY_SERVERS
-    SERVERS="$(echo "$FULL_REQ" | jq -r 'keys | join(" ")')"
+    SERVERS="$(jq -r 'keys | join(" ")' /tmp/caddy-lb-policy-switch.json)"
    
     debug "Servers: $SERVERS"
 
@@ -102,23 +102,20 @@ function identify_request() {
         
         debug "checking server: $SERVER"
 
-        # Identify the routes
-        LENGTH="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers/"${SERVER:?}"/routes | jq length)"
-        
-        debug "Routes: $LENGTH"
+        REQ="$(jq --arg domain "$URL_TO_FIND" --arg server "$SERVER" -cMr '
+                .[$server].routes[]
+                | select(
+                    (.match[] | (.host | index($domain)) != null)
+                    and 
+                    (.handle[].routes[].handle[].upstreams != null) 
+                  )' /tmp/caddy-lb-policy-switch.json)"
 
-        for route in $(seq 0 $((LENGTH-1))); do
-            REQ_URL="$ACTUAL_URL/config/apps/http/servers/${SERVER:?}/routes/$route"
-            REQ="$(curl -u "$USERNAME_PASSWORD" -s "$REQ_URL")"
-            export REQ
-            export REQ_URL
-
-            if (echo "$REQ" | jq -r '.match[].host | join(" ")' 2> /dev/null | grep -qw "$URL_TO_FIND"); then
-                echo "Match found, route: $route, server: $SERVER"
-                change_upstreams "$1" "$2" "$IDENTIFIER"
-            fi
-        done
+        if [[ -n "$REQ" ]]; then
+            debug "REQ: $REQ"
+            change_upstreams "$1" "$2" "$IDENTIFIER"
+        fi 
     done
+    rm -f /tmp/caddy-lb-policy-switch.json
 }
 
 function change_upstreams() {
