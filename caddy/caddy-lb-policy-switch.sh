@@ -7,6 +7,8 @@ if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then
     exit 0 
 fi
 
+trap 'rm -f /tmp/caddy-lb-policy-switch.json && exit' INT
+
 function debug() {
     if [[ "$DEBUG" -eq 1 ]]; then
         echo "debug: $1"
@@ -231,6 +233,7 @@ function change_upstreams() {
     
     mkdir -p /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"
     echo "$1" > /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"/lb_policy
+    sleep ${LB_POLICY_CHANGE_SLEEP:-1}
 }
 
 function adjust_api_urls() {
