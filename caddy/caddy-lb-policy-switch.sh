@@ -19,6 +19,25 @@ function verbose() {
     fi
 }
 
+function verbose_alarm() {
+    if [[ "$VERBOSE" -eq 1 ]]; then
+        echo "$1"
+        alarm "$1"
+    fi
+}
+
+function remove_password() {
+    CENSORED_CADDY_API_URLS=()
+    local url=("$@")
+
+    for i in "${url[@]}"; do
+        
+        CENSORED_CADDY_API_URLS+=("${i#*@}")
+    done
+
+    export CENSORED_CADDY_API_URLS
+}
+
 function hostname_to_url() {
     local hostname="$1"
 
@@ -249,9 +268,14 @@ for conf in /etc/glb/*.conf; do
     fi
     
     if [[ "$NO_DYNAMIC_API_URLS" -ne 1 ]]; then
-        debug "CADDY_API_URLS: ${CADDY_API_URLS[*]}"
+        remove_password "${CADDY_API_URLS[@]}"
+        verbose_alarm "CADDY_API_URLS: ${CENSORED_CADDY_API_URLS[*]}"
+        
         adjust_api_urls
-        debug "CADDY_API_URLS_NEW: ${CADDY_API_URLS_NEW[*]}"
+        unset CENSORED_CADDY_API_URLS
+        
+        remove_password "${CADDY_API_URLS_NEW[@]}" 
+        verbose_alarm "CADDY_API_URLS_NEW: ${CENSORED_CADDY_API_URLS[*]}"
     fi
     
     if [[ "$LOOP_ORDER" == "SERVERS" ]]; then
@@ -279,7 +303,7 @@ for conf in /etc/glb/*.conf; do
     fi 
 
 
-    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG; do
+    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM NO_CHANGES_EXIT_THRESHOLD CADDY_LB_URLS NO_DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG CENSORED_CADDY_API_URLS; do
         unset $i
     done
 
