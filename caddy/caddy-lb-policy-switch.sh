@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Switch the load balancing policy of a Caddy server
+start=`date +%s`
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
     echo "v0.4.0" 
@@ -285,3 +286,7 @@ for conf in /etc/glb/*.conf; do
     echo "Done with $conf"
     echo "---------------------------------"
 done
+
+end=`date +%s`
+runtime=$((end-start))
+echo "Script runtime: $runtime seconds"
