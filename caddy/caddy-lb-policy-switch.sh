@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 ###~ description: Switch the load balancing policy of a Caddy server
-start=`date +%s`
+start="$(date +%s)"
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
-    echo "v0.4.0" 
+    echo "v0.5.0" 
     exit 0 
 fi
+
+trap 'rm -f /tmp/caddy-lb-policy-switch.json && exit' INT
 
 function debug() {
     if [[ "$DEBUG" -eq 1 ]]; then
@@ -85,14 +87,17 @@ function alarm() {
 
 function identify_request() {
     
-    read IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
-    read ACTUAL_URL < <(awk -F '[@;]' '{print $1}' <<< "$URL")
+    read -r IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
+    read -r ACTUAL_URL < <(awk -F '[@;]' '{print $1}' <<< "$URL")
     
+    export ACTUAL_URL
     debug "Checking $ACTUAL_URL for $IDENTIFIER"
     debug "Username-Password: $USERNAME_PASSWORD"
+    
+    curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers -o /tmp/caddy-lb-policy-switch.json
 
     # Not to be confused with CADDY_SERVERS
-    SERVERS="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers | jq -r 'keys | join(" ")')"
+    SERVERS="$(jq -r 'keys | join(" ")' /tmp/caddy-lb-policy-switch.json)"
    
     debug "Servers: $SERVERS"
 
@@ -100,23 +105,35 @@ function identify_request() {
         
         debug "checking server: $SERVER"
 
-        # Identify the routes
-        LENGTH="$(curl -s -u "$USERNAME_PASSWORD" "$ACTUAL_URL"/config/apps/http/servers/"${SERVER:?}"/routes | jq length)"
+        REQ="$(jq --arg domain "$URL_TO_FIND" --arg server "$SERVER" -cMr '
+                .[$server].routes[]
+                | select(
+                    (.match[] | (.host | index($domain)) != null)
+                    and 
+                    (.handle[].routes[].handle[].upstreams != null) 
+                  )' /tmp/caddy-lb-policy-switch.json)"
         
-        debug "Routes: $LENGTH"
+        ROUTE_ID="$(jq --arg domain "$URL_TO_FIND" --arg server "$SERVER" -n '
+    input
+        | .[$server].routes
+        | to_entries[]
+        | select(
+              (.value.match[] | (.host | index($domain)) != null) 
+              and 
+              (.value.handle[].routes[].handle[].upstreams != null)
+          )
+        | .key
+' /tmp/caddy-lb-policy-switch.json)"
 
-        for route in $(seq 0 $((LENGTH-1))); do
-            REQ_URL="$ACTUAL_URL/config/apps/http/servers/${SERVER:?}/routes/$route"
-            REQ="$(curl -u "$USERNAME_PASSWORD" -s "$REQ_URL")"
-            export REQ
-            export REQ_URL
+        export REQ
+        export ROUTE_ID
 
-            if (echo "$REQ" | jq -r '.match[].host | join(" ")' 2> /dev/null | grep -qw "$URL_TO_FIND"); then
-                echo "Match found, route: $route, server: $SERVER"
-                change_upstreams "$1" "$2" "$IDENTIFIER"
-            fi
-        done
+        if [[ -n "$REQ" ]]; then
+            debug "REQ: $REQ"
+            change_upstreams "$1" "$2" "$IDENTIFIER" "$SERVER"
+        fi 
     done
+    rm -f /tmp/caddy-lb-policy-switch.json
 }
 
 function change_upstreams() {
@@ -131,9 +148,14 @@ function change_upstreams() {
         IDENTIFIER="$URL"
     fi
 
+    REQ_URL="$ACTUAL_URL"/config/apps/http/servers/"$4"/routes/"$ROUTE_ID"
+
+    debug "REQ_URL: $REQ_URL"
+
     case $1 in
-        first)
-            REQ_TO_SEND="$(echo "$REQ" | jq --arg SRVNAME "$2" -cMr '
+        first_dc1 | first_dc2)
+            second="${1#*_}"
+            REQ_TO_SEND="$(echo "$REQ" | jq --arg SRVNAME "$second" -cMr '
                 .handle[] |= (
                   .routes[] |= (
                     .handle[] |= (
@@ -152,21 +174,23 @@ function change_upstreams() {
                 )
                 ')"
 
+            debug "REQ_TO_SEND: $REQ_TO_SEND"
+
             if [[ "$REQ_TO_SEND" == "$REQ" ]] && [[ "$SERVER_OVERRIDE_CONFIG" != "1" ]]; then
-                echo "No changes needed as the upstreams are already in the first_$2 order"
+                echo "No changes needed as the upstreams are already in the $1 order"
                 NO_CHANGES_COUNTER=$((NO_CHANGES_COUNTER+1))
                 export NO_CHANGES_COUNTER
                 if [[ "$VERBOSE" -eq 1 ]]; then
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the first_$2 order"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] No changes needed as the upstreams are already in the $1 order"
                 fi
                 return
             else
                 echo "Sending request to change upstreams"
                 
                 if curl -u "$USERNAME_PASSWORD" -X PATCH -H "Content-Type: application/json" -d "$REQ_TO_SEND" "$REQ_URL" 2> /tmp/caddy-lb-policy-switch-error.log; then
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched upstreams to first_$2"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched upstreams to $1"
                 else
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to first_$2\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
+                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to $1\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
                 fi
 
             fi
@@ -206,6 +230,10 @@ function change_upstreams() {
             exit 1
             ;;
     esac
+    
+    mkdir -p /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"
+    echo "$1" > /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"/lb_policy
+    sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
 }
 
 function adjust_api_urls() {
@@ -245,18 +273,30 @@ if [ ! -d /etc/glb ]; then
     exit 1
 fi
 
-for conf in /etc/glb/*.conf; do
-    [ ! -f "$conf" ] && continue
-    
-    #shellcheck disable=SC1090
-    . "$conf"
-    
+if [ -f "/tmp/caddy-lb-policy-switch.json" ]; then
+    echo "Instance of the script is already running"
+    exit
+fi
+
+function main() {
     echo "---------------------------------"
-    echo "Config: $conf"
+    
+    if [[ -n "$3" ]]; then
+        echo "Using $3 as the configuration file"
+        
+        # shellcheck source=/dev/null
+        . "$3"
+    fi
 
     for i in CADDY_API_URLS CADDY_SERVERS; do
         if [[ ${#i[@]} -eq 0 ]]; then
-            echo "$i is empty, please define it on $conf"
+
+            if [[ -n "$conf" ]]; then
+                echo "$i is empty, please define it on $conf"
+            else
+                echo "$i is empty, please define it"
+            fi
+            
             exit 1
         fi
     done
@@ -300,16 +340,25 @@ for conf in /etc/glb/*.conf; do
             done
         done
     fi 
+}
 
-
-    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM SERVER_NOCHANGE_EXIT_THRESHOLD CADDY_LB_URLS DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG CENSORED_CADDY_API_URLS; do
-        unset $i
+if [[ "$USE_ENV" -eq 1 ]]; then
+    main "$1" "$2"
+else
+    for conf in /etc/glb/*.conf; do
+        [ ! -f "$conf" ] && continue
+        
+        main "$1" "$2" "$conf"
+    
+        for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM SERVER_NOCHANGE_EXIT_THRESHOLD CADDY_LB_URLS DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG CENSORED_CADDY_API_URLS; do
+            unset $i
+        done
+    
+        echo "Done with $conf"
+        echo "---------------------------------"
     done
+fi
 
-    echo "Done with $conf"
-    echo "---------------------------------"
-done
-
-end=`date +%s`
+end="$(date +%s)"
 runtime=$((end-start))
 echo "Script runtime: $runtime seconds"
