@@ -3,7 +3,7 @@
 start="$(date +%s)"
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
-    echo "v0.5.0" 
+    echo "v1.0.0" 
     exit 0 
 fi
 
@@ -233,7 +233,6 @@ function change_upstreams() {
     
     mkdir -p /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"
     echo "$1" > /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"/lb_policy
-    sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
 }
 
 function adjust_api_urls() {
@@ -327,6 +326,7 @@ function main() {
                 identify_request "$1" "$2"
                 echo '---------------------------------'
             done
+            sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
         done
     else
         for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
@@ -336,6 +336,7 @@ function main() {
                 echo '---------------------------------'
                 echo "Checking '$URL_TO_FIND' on '$URL'"
                 identify_request "$1" "$2"
+                sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
                 echo '---------------------------------'
             done
         done
