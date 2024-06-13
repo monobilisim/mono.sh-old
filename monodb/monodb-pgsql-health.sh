@@ -317,7 +317,7 @@ function cluster_status() {
                 if [ "${cluster_roles[$i]}" == "leader" ]; then
                     alarm "[Patroni - $IDENTIFIER] [:check:] New leader is $cluster!"
                     if [[ -n "$LEADER_SWITCH_HOOK" ]] && [[ -f "/etc/patroni/patroni.yml" ]]; then
-                        if [[ "$(curl "$CLUSTER_URL" | jq -r .role)" == "master" ]]; then
+                        if [[ "$(curl -s "$PATRONI_API" | jq -r .role)" == "master" ]]; then
                             eval "$LEADER_SWITCH_HOOK"
                             EXIT_CODE=$?
                             if [ $? -eq 0 ]; then
