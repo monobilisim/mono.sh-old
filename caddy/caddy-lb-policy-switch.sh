@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Switch the load balancing policy of a Caddy server
-start=`date +%s`
+start="$(date +%s)"
 
 if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then 
     echo "v0.5.0" 
@@ -87,8 +87,8 @@ function alarm() {
 
 function identify_request() {
     
-    read IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
-    read ACTUAL_URL < <(awk -F '[@;]' '{print $1}' <<< "$URL")
+    read -r IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
+    read -r ACTUAL_URL < <(awk -F '[@;]' '{print $1}' <<< "$URL")
     
     export ACTUAL_URL
     debug "Checking $ACTUAL_URL for $IDENTIFIER"
@@ -154,7 +154,7 @@ function change_upstreams() {
 
     case $1 in
         first_dc1 | first_dc2)
-            IFS='_' read -r first second <<< "$1"
+            second="${1#*_}"
             REQ_TO_SEND="$(echo "$REQ" | jq --arg SRVNAME "$second" -cMr '
                 .handle[] |= (
                   .routes[] |= (
@@ -233,7 +233,7 @@ function change_upstreams() {
     
     mkdir -p /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"
     echo "$1" > /tmp/glb/"$URL_TO_FIND"/"$IDENTIFIER"/lb_policy
-    sleep ${LB_POLICY_CHANGE_SLEEP:-1}
+    sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
 }
 
 function adjust_api_urls() {
@@ -278,18 +278,25 @@ if [ -f "/tmp/caddy-lb-policy-switch.json" ]; then
     exit
 fi
 
-for conf in /etc/glb/*.conf; do
-    [ ! -f "$conf" ] && continue
-    
-    #shellcheck disable=SC1090
-    . "$conf"
-    
+function main() {
     echo "---------------------------------"
-    echo "Config: $conf"
+    
+    if [[ -n "$3" ]]; then
+        echo "Using $3 as the configuration file"
+        
+        # shellcheck source=/dev/null
+        . "$3"
+    fi
 
     for i in CADDY_API_URLS CADDY_SERVERS; do
         if [[ ${#i[@]} -eq 0 ]]; then
-            echo "$i is empty, please define it on $conf"
+
+            if [[ -n "$conf" ]]; then
+                echo "$i is empty, please define it on $conf"
+            else
+                echo "$i is empty, please define it"
+            fi
+            
             exit 1
         fi
     done
@@ -333,16 +340,25 @@ for conf in /etc/glb/*.conf; do
             done
         done
     fi 
+}
 
-
-    for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM SERVER_NOCHANGE_EXIT_THRESHOLD CADDY_LB_URLS DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG CENSORED_CADDY_API_URLS; do
-        unset $i
+if [[ "$USE_ENV" -eq 1 ]]; then
+    main "$1" "$2"
+else
+    for conf in /etc/glb/*.conf; do
+        [ ! -f "$conf" ] && continue
+        
+        main "$1" "$2" "$conf"
+    
+        for i in CADDY_API_URLS CADDY_API_URLS_NEW CADDY_SERVERS ALARM_BOT_USER_EMAILS ALARM_WEBHOOK_URLS ALARM_BOT_EMAIL ALARM_BOT_API_KEY ALARM_BOT_API_URL ALARM_WEBHOOK_URL SEND_ALARM SEND_DM_ALARM SERVER_NOCHANGE_EXIT_THRESHOLD CADDY_LB_URLS DYNAMIC_API_URLS SERVER_OVERRIDE_CONFIG LOOP_ORDER VERBOSE DEBUG CENSORED_CADDY_API_URLS; do
+            unset $i
+        done
+    
+        echo "Done with $conf"
+        echo "---------------------------------"
     done
+fi
 
-    echo "Done with $conf"
-    echo "---------------------------------"
-done
-
-end=`date +%s`
+end="$(date +%s)"
 runtime=$((end-start))
 echo "Script runtime: $runtime seconds"
