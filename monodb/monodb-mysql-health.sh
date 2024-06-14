@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of MySQL and MySQL cluster
-VERSION=v0.6.0
+VERSION=v1.0.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -185,10 +185,10 @@ function check_process_count() {
     processlist_count=$(/usr/bin/mysqladmin processlist | grep -vc 'show processlist')
 
     if [[ "$processlist_count" -lt "$PROCESS_LIMIT" ]]; then
-        alarm_check_up "no_processes" "Number of processes is below limit: $processlist_count/$PROCESS_LIMIT" 
+        alarm_check_up "no_processes" "Number of processes is below limit: $processlist_count/$PROCESS_LIMIT" "process"
         print_colour "Number of Processes" "$processlist_count/$PROCESS_LIMIT"
     else
-        alarm_check_down "no_processes" "Number of processes is above limit: $processlist_count/$PROCESS_LIMIT" 
+        alarm_check_down "no_processes" "Number of processes is above limit: $processlist_count/$PROCESS_LIMIT" "process"
         print_colour "Number of Processes" "$processlist_count/$PROCESS_LIMIT" "error"
     fi
 
