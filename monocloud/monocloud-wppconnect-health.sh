@@ -124,9 +124,6 @@ function alarm_check_down() {
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
                         alarm "[Mono Cloud WPPConnect - $IDENTIFIER] [:red_circle:] $2"
-                        if [ $3 == "service" ] || [ $3 == "queue" ]; then
-                            check_active_sessions
-                        fi
                     fi
                 fi
             fi
@@ -184,17 +181,6 @@ function wpp_check() {
     done
 }
 
-function check_active_sessions() {
-    active_sessions=($(ls /var/run/ssh-session))
-    if [[ ${#active_sessions[@]} == 0 ]]; then
-        return
-    else
-        for session in "${active_sessions[@]}"; do
-            user=$(jq -r .username /var/run/ssh-session/"$session")
-            alarm_check_down "session_$session" "User *$user* is connected to host"
-        done
-    fi
-}
 
 function main() {
     printf '\n'

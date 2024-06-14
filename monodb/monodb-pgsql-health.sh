@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of PostgreSQL and Patroni cluster
-VERSION=v1.0.0
+VERSION=v1.1.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -147,9 +147,6 @@ function alarm_check_down() {
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
                         alarm "[PostgreSQL - $IDENTIFIER] [:red_circle:] $2"
-                        if [ $3 == "service" ]; then
-                            check_active_sessions
-                        fi
                     fi
                 fi
             fi
@@ -183,21 +180,9 @@ function alarm_check_up() {
     fi
 }
 
-function check_active_sessions() {
-    active_sessions=($(ls /var/run/ssh-session))
-    if [[ ${#active_sessions[@]} == 0 ]]; then
-        return
-    else
-        for session in "${active_sessions[@]}"; do
-            user=$(jq -r .username /var/run/ssh-session/"$session")
-            alarm_check_down "session_$session" "User *$user* is connected to host"
-        done
-    fi
-}
-
 function postgresql_status() {
     echo_status "PostgreSQL Status"
-    if systemctl status postgresql.service >/dev/null || systemctl status postgresql*.service >/dev/null; then
+    if systemctl status postgresql.service &>/dev/null || systemctl status postgresql*.service >/dev/null; then
         print_colour "PostgreSQL" "Active"
         alarm_check_up "postgresql" "PostgreSQL is active again!"
     else
@@ -244,14 +229,32 @@ function check_active_connections() {
 
     fi
 
+    file="/tmp/monodb-pgsql-health/last-connection-above-limit.txt"
     max_conn="$(echo "$max_and_used" | awk '{print $1}')"
     used_conn="$(echo "$max_and_used" | awk '{print $3}')"
-    if eval "$(echo "$max_conn $used_conn" | awk '{if ($2 >= $1 * 0.9) print "true"; else print "false"}')"; then
-        alarm_check_down "active_conn" "Number of Active Connections is $used_conn and Above %90"
-        print_colour "Number of Active Connections" "$used_conn and Above %90" "error"
+
+    used_percentage=$(echo "$max_conn $used_conn" | awk '{print ($2*100/$1)}')
+    if [ -f "$file" ]; then
+        increase=$(cat $file)
     else
-        alarm_check_up "active_conn" "Number of Active Connections is $used_conn and Below %90"
-        print_colour "Number of Active Connections" "$used_conn and Below %90"
+        increase=1
+    fi
+
+    if eval "$(echo "$used_percentage $CONN_LIMIT_PERCENT" | awk '{if ($1 >= $2) print "true"; else print "false"}')"; then
+        alarm_check_down "active_conn" "Number of Active Connections is $used_conn ($used_percentage)% and Above $CONN_LIMIT_PERCENT%"
+        print_colour "Number of Active Connections" "$used_conn ($used_percentage)% and Above $CONN_LIMIT_PERCENT%" "error"
+        difference=$(((${used_percentage%.*} - ${CONN_LIMIT_PERCENT%.*}) / 10))
+        if [[ $difference -ge $increase ]]; then
+            increase=$((difference + 1))
+            if [ -f "$file" ]; then
+                alarm "[PostgreSQL - $IDENTIFIER] [:red_circle:] Number of Active Connections has passed $((CONN_LIMIT_PERCENT + (increase * 10)))% - It is now $used_conn%"
+            fi
+        fi
+        echo "$increase" >$file
+    else
+        alarm_check_up "active_conn" "Number of Active Connections is $used_conn ($used_percentage)% and Below $CONN_LIMIT_PERCENT%"
+        print_colour "Number of Active Connections" "$used_conn ($used_percentage)% and Below $CONN_LIMIT_PERCENT%"
+        rm -f $file
     fi
 }
 
@@ -263,15 +266,14 @@ function check_running_queries() {
         queries=$(gitlab-psql -c "SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';" | awk 'NR==3 {print $1}')
     else
         queries=$(su - postgres -c "psql -c \"SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';\"" | awk 'NR==3 {print $1}')
-
     fi
 
     # SELECT COUNT(*) AS active_queries_count FROM pg_stat_activity WHERE state = 'active';
     if [[ "$queries" -gt "$QUERY_LIMIT" ]]; then
-        alarm_check_down "query_limit" "Number of Active Queries is $queries/$QUERY_LIMIT"
+        alarm_check_down "query_limit" "Number of Active Queries is $queries/$QUERY_LIMIT" "active_queries"
         print_colour "Number of Active Queries" "$queries/$QUERY_LIMIT" "error"
     else
-        alarm_check_up "query_limit" "Number of Active Queries is $queries/$QUERY_LIMIT"
+        alarm_check_up "query_limit" "Number of Active Queries is $queries/$QUERY_LIMIT" "active_queries"
         print_colour "Number of Active Queries" "$queries/$QUERY_LIMIT"
     fi
 }
@@ -320,7 +322,7 @@ function cluster_status() {
                         if [[ "$(curl -s "$PATRONI_API" | jq -r .role)" == "master" ]]; then
                             eval "$LEADER_SWITCH_HOOK"
                             EXIT_CODE=$?
-                            if [ $? -eq 0 ]; then
+                            if [ $EXIT_CODE -eq 0 ]; then
                                 alarm "[Patroni - $IDENTIFIER] [:check:] Leader switch hook executed successfully"
                             else
                                 alarm "[Patroni - $IDENTIFIER] [:red_circle:] Leader switch hook failed with exit code $EXIT_CODE"

@@ -121,9 +121,6 @@ function alarm_check_down() {
                     if ((time_diff >= ALARM_INTERVAL)); then
                         date "+%Y-%m-%d %H:%M locked" >"${file_path}"
                         alarm "[MySQL - $IDENTIFIER] [:red_circle:] $2"
-                        if [ $3 == "service" ]; then
-                            check_active_sessions
-                        fi
                     fi
                 fi
             fi
@@ -153,18 +150,6 @@ function alarm_check_up() {
                 alarm "[MySQL - $IDENTIFIER] [:check:] $2"
             fi
         fi
-    fi
-}
-
-function check_active_sessions() {
-    active_sessions=($(ls /var/run/ssh-session))
-    if [[ ${#active_sessions[@]} == 0 ]]; then
-        return
-    else
-        for session in "${active_sessions[@]}"; do
-            user=$(jq -r .username /var/run/ssh-session/"$session")
-            alarm_check_down "session_$session" "User *$user* is connected to host"
-        done
     fi
 }
 
