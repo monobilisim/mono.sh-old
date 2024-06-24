@@ -430,6 +430,7 @@ report_status() {
     table_md+="\n"
     table_md+="|--|--|--|--|--|"
     table+='\n'
+    diskcount="$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber < $PART_USE_LIMIT) | [.percentag      e, .usage, .total, .partition, .mountpoint] | @tsv | length")"
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber < $PART_USE_LIMIT)")" ]]; then
         local oldifs=$IFS
@@ -443,27 +444,29 @@ report_status() {
             mountpoint=${a[4]}
 
             [[ "$mountpoint" == "/" ]] && mountpoint="/sys_root"
+            
+            if [[ -f "/tmp/monocloud-health/redmine_issue_id" && $percentage -ge $((PART_USE_LIMIT - ${REDMINE_ISSUE_DELETE_THRESHOLD:-5})) ]]; then
+		        REDMINE_CLOSE=0
+	        fi
+
             [[ -f "/tmp/monocloud-health/${mountpoint//\//_}" ]] && {
-		table_md+="\n$(printf '| %s | %s | %s | %s | %s |\n' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
+		        table_md+="\n$(printf '| %s | %s | %s | %s | %s |\n' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
                 table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
-                underthreshold_disk=1
+                underthreshold_disk=$(( underthreshold_disk + 1 ))
                 rm -f /tmp/monocloud-health/${mountpoint//\//_}
             }
-	    if [[ -f "/tmp/monocloud-health/redmine_issue_id" && $percentage -ge $((PART_USE_LIMIT - ${REDMINE_ISSUE_DELETE_THRESHOLD:-5})) ]]; then
-		REDMINE_CLOSE=0
-	    fi
         done
         message+="$table\n\`\`\`\"}"
+
+        if [[ "$underthreshold_disk" == "$diskcount" && "${REDMINE_ENABLE:-1}" == "1" && -f "/tmp/monocloud-health/redmine_issue_id" && "$REDMINE_CLOSE" == "1" ]]; then
+            curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Disk kullanım oranları, %$PART_USE_LIMIT altına geri indiği için iş kapatılıyor\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\", \"assigned_to_id\": \"me\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+            rm -f /tmp/monocloud-health/redmine_issue_id
+        fi
+        
         IFS=$oldifs
         #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Underthreshold today..."; }
-        if [[ "$underthreshold_disk" == "1" ]]; then
+        if [[ "$underthreshold_disk" -ge 1 ]]; then
 	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
-	    if [[ "${REDMINE_ENABLE:-1}" == "1" && -f "/tmp/monocloud-health/redmine_issue_id" && "$REDMINE_CLOSE" == "1" ]]; then
-		# Delete issue
-		#curl -fsSL -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
-		curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Disk kullanım oranı %$percentage, %$PART_USE_LIMIT altına geri indiği için iş kapatılıyor\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\", \"assigned_to_id\": \"me\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
-		rm -f /tmp/monocloud-health/redmine_issue_id
-	    fi
 	fi
     fi
 
