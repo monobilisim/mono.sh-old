@@ -44,8 +44,9 @@ check_config_file() {
     . "$@"
     local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT)
     
-    if [[ -z "$ALARM_WEBHOOK_URL" ]] || [[ -z "$ALARM_WEBHOOK_URLS" ]]; then
+    if [[ -z "$ALARM_WEBHOOK_URL" && -z "$ALARM_WEBHOOK_URLS" ]]; then
             echo "ALARM_WEBHOOK_URL nor ALARM_WEBHOOK_URLS is not set in \"$@\". exiting..."
+            exit 1
     fi
 
     if [[ "$REDMINE_ENABLE" == "1" ]]; then
