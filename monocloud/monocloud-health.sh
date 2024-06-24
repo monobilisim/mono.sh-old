@@ -42,7 +42,16 @@ check_config_file() {
         exit 1
     }
     . "$@"
-    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT ALARM_WEBHOOK_URL REDMINE_URL REDMINE_API_KEY)
+    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT)
+    
+    if [[ -z "$ALARM_WEBHOOK_URL" ]] || [[ -z "$ALARM_WEBHOOK_URLS" ]]; then
+            echo "ALARM_WEBHOOK_URL nor ALARM_WEBHOOK_URLS is not set in \"$@\". exiting..."
+    fi
+
+    if [[ "$REDMINE_ENABLE" == "1" ]]; then
+        required_vars+=(REDMINE_URL REDMINE_API_KEY)
+    fi
+
     for var in "${required_vars[@]}"; do
         [[ -z "${!var}" ]] && {
             echo "Variable \"$var\" is not set in \"$@\". exiting..."
