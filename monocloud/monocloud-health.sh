@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v4.3.9"
+script_version="v4.3.10"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -524,9 +524,12 @@ report_status() {
             elif [[ "$REDMINE_SEND_UPDATE" == "1" ]]; then
 		        curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"$table_md\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
 		    fi
-		    message="Redmine issue: $REDMINE_URL/issues/$(cat /tmp/monocloud-health/redmine_issue_id)"
+            message+="\n\`\`\`\n"
+		    message+="Redmine issue: $REDMINE_URL/issues/$(cat /tmp/monocloud-health/redmine_issue_id)"
+            message+="\n\"}"
+        else
+            message+="\n\`\`\`\"}"
         fi
-        message+="\n\`\`\`\"}"
 	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$ALARM_WEBHOOK_URL"
 	else
 	    echo "There's no alarm for Overthreshold (DISK) today..."
