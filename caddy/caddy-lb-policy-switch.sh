@@ -323,8 +323,12 @@ function main() {
                 USERNAME_PASSWORD="${URL_UP%%@*}"
                 echo '---------------------------------'
                 echo "Checking '$URL_TO_FIND' on '$URL'"
+                start="$(date +%s)"
                 identify_request "$1" "$2"
+                end="$(date +%s)"
                 echo '---------------------------------'
+                read -r IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
+                verbose_alarm "$URL_TO_FIND switched to upstream $1 for $IDENTIFIER in $((end-start)) seconds, slept for ${LB_POLICY_CHANGE_SLEEP:-1} seconds"
             done
             sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
         done
@@ -335,10 +339,15 @@ function main() {
             for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
                 echo '---------------------------------'
                 echo "Checking '$URL_TO_FIND' on '$URL'"
+                start="$(date +%s)"
                 identify_request "$1" "$2"
+                end="$(date +%s)"
                 sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
                 echo '---------------------------------'
             done
+            read -r IDENTIFIER < <(awk -F '[@;]' '{print $2}' <<< "$URL")
+            caddy_servers_humanreadable=$(IFS=, ; echo "${CADDY_SERVERS[*]}")
+            verbose_alarm "$caddy_servers_humanreadable switched to upstream $1 for $IDENTIFIER in $((end-start)) seconds, slept for ${LB_POLICY_CHANGE_SLEEP:-1} seconds"
         done
     fi 
 }
