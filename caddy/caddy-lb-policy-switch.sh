@@ -319,7 +319,7 @@ function main() {
     if [[ "$LOOP_ORDER" == "SERVERS" ]]; then
         bad_urls=()
         slept_for=0
-        start="$(date +%s)"
+        start_func="$(date +%s)"
         for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
             for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
                 URL="${URL_UP#*@}"
@@ -333,7 +333,7 @@ function main() {
             sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
             slept_for=$((slept_for+LB_POLICY_CHANGE_SLEEP))
         done
-        end="$(date +%s)"
+        end_func="$(date +%s)"
         
         CADDY_SERVERS_WO_BAD=("${CADDY_SERVERS[@]}")
 
@@ -346,7 +346,7 @@ function main() {
         CADDY_SERVERS_WO_BAD_HUMANREADABLE="${CADDY_SERVERS_WO_BAD[*]// /, }"
         bad_urls_humanreadable="${bad_urls[*]// /, }"
 
-        alarm "$CADDY_SERVERS_WO_BAD_HUMANREADABLE switched to upstream $1 in $((end-start)) seconds, slept for $slept_for seconds"
+        alarm "$CADDY_SERVERS_WO_BAD_HUMANREADABLE switched to upstream $1 in $((end_func-start_func)) seconds, slept for $slept_for seconds"
         alarm "$bad_urls_humanreadable failed to switch upstreams to $1"
     else
         for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
@@ -355,9 +355,7 @@ function main() {
             for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
                 echo '---------------------------------'
                 echo "Checking '$URL_TO_FIND' on '$URL'"
-                start="$(date +%s)"
                 identify_request "$1" "$2"
-                end="$(date +%s)"
                 sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
                 echo '---------------------------------'
             done
