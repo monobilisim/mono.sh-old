@@ -188,7 +188,7 @@ function change_upstreams() {
                 echo "Sending request to change upstreams"
                 
                 if curl -u "$USERNAME_PASSWORD" -X PATCH -H "Content-Type: application/json" -d "$REQ_TO_SEND" "$REQ_URL" 2> /tmp/caddy-lb-policy-switch-error.log; then
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched upstreams to $1"
+                    echo "[$IDENTIFIER] [$URL_TO_FIND] Switched upstreams to $1"
                 else
                     alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to $1\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
                 fi
@@ -347,7 +347,9 @@ function main() {
         bad_urls_humanreadable="${bad_urls[*]// /, }"
 
         alarm "$CADDY_SERVERS_WO_BAD_HUMANREADABLE switched to upstream $1 in $((end_func-start_func)) seconds, slept for $slept_for seconds"
-        alarm "$bad_urls_humanreadable failed to switch upstreams to $1"
+        if [[ ${#bad_urls[@]} -ne 0 ]]; then
+            alarm "$bad_urls_humanreadable failed to switch upstreams to $1"
+        fi
     else
         for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
             URL="${URL_UP#*@}"
