@@ -1,0 +1,4 @@
+ignored_services:
+  - asterniclog 
+restart_attempt_interval: 15 # in minutes
+trunk_check_interval: 3

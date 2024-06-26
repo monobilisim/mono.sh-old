@@ -1,0 +1,10 @@
+postgres:
+  patroni_api: http://localhost:8008
+  process_limit: 50
+  query_limit: 25
+  conn_limit_percent: 70
+  
+mysql:
+  process_limit: 50
+  is_cluster: false
+  cluster_size: 3
