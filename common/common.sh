@@ -35,6 +35,30 @@ function yaml() {
     esac
 }
 
+function check_yq() {
+    # https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
+    if [ -z "$(command -v yq)" ]; then
+    
+        if [[ "$1" == "--yq" ]]; then
+            echo "Couldn't find yq. Installing it..."
+            yn="y"
+        else
+            read -r -p "Couldn't find yq. Do you want to download it and put it under /usr/local/bin? [y/n]: " yn
+        fi
+    
+        case $yn in
+        [Yy]*)
+            curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64' | grep -v 'tar.gz')" --output /usr/local/bin/yq
+            chmod +x /usr/local/bin/yq
+            ;;
+        [Nn]*)
+            echo "Aborted"
+            exit 1
+            ;;
+        esac
+    fi
+}
+
 function parse_common() {
     # Alarm
     readarray -t ALARM_WEBHOOK_URLS < <(yaml .alarm.webhook_urls[])
@@ -58,3 +82,6 @@ function parse_common() {
     REDMINE_STATUS_ID="$(yaml .redmine.status_id)"
     REDMINE_STATUS_ID_CLOSED="$(yaml .redmine.status_id_closed)"
 }
+
+check_yq
+parse_common
