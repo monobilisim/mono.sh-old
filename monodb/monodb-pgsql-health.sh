@@ -49,9 +49,9 @@ function echo_status() {
 
 function print_colour() {
     if [ "$3" != 'error' ]; then
-        printf "  %-40s %s\n" "${BLUE_FG}$1${RESET}" "is ${GREEN_FG}$2${RESET}"
+        printf "  %-40s %s\n" "${BLUE_FG}$1${RESET}" "${GREEN_FG}$2${RESET}"
     else
-        printf "  %-40s %s\n" "${BLUE_FG}$1${RESET}" "is ${RED_FG}$2${RESET}"
+        printf "  %-40s %s\n" "${BLUE_FG}$1${RESET}" "${RED_FG}$2${RESET}"
     fi
 }
 
@@ -227,8 +227,8 @@ function check_active_connections() {
     fi
 
     if eval "$(echo "$used_percentage $CONN_LIMIT_PERCENT" | awk '{if ($1 >= $2) print "true"; else print "false"}')"; then
-        alarm_check_down "active_conn" "Number of Active Connections is $used_conn ($used_percentage%) and Above $CONN_LIMIT_PERCENT%"
-        print_colour "Number of Active Connections" "$used_conn ($used_percentage)% and Above $CONN_LIMIT_PERCENT%" "error"
+        alarm_check_down "active_conn" "Number of active connections is $used_conn ($used_percentage%) and above $CONN_LIMIT_PERCENT%"
+        print_colour "Number of Active Connections" "$used_conn ($used_percentage%) and Above $CONN_LIMIT_PERCENT%" "error"
         difference=$(((${used_percentage%.*} - ${CONN_LIMIT_PERCENT%.*}) / 10))
         if [[ $difference -ge $increase ]]; then
             if [ -f "$file" ]; then
@@ -238,8 +238,8 @@ function check_active_connections() {
         fi
         echo "$increase" >$file
     else
-        alarm_check_up "active_conn" "Number of Active Connections is $used_conn ($used_percentage)% and Below $CONN_LIMIT_PERCENT%"
-        print_colour "Number of Active Connections" "$used_conn ($used_percentage)% and Below $CONN_LIMIT_PERCENT%"
+        alarm_check_up "active_conn" "Number of active connections is $used_conn ($used_percentage)% and below $CONN_LIMIT_PERCENT%"
+        print_colour "Number of Active Connections" "$used_conn ($used_percentage)% and below $CONN_LIMIT_PERCENT%"
         rm -f $file
     fi
 }
@@ -287,7 +287,7 @@ function cluster_status() {
     mapfile -t cluster_states < <(curl -s "$CLUSTER_URL" | jq -r '.members[] | .state')
     name=$(yq -r .name /etc/patroni/patroni.yml)
     this_node=$(curl -s "$CLUSTER_URL" | jq -r --arg name "$name" '.members[] | select(.name==$name) | .role')
-    print_colour "This node" "$this_node"
+    print_colour "This Node" "$this_node"
 
     printf '\n'
     echo_status "Cluster Roles"
