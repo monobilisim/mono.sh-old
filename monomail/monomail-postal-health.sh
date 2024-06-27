@@ -45,13 +45,9 @@ if [ "$1" == "test" ]; then postal_config="./test.yaml"; else postal_config=/opt
 
 function alarm() {
       if [ "$SEND_ALARM" == "1" ]; then
-          if [ -z "$ALARM_WEBHOOK_URLS" ]; then
-	    curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
-	  else
 	    for webhook in "${ALARM_WEBHOOK_URLS[@]}"; do
-		curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$webhook" 1>/dev/null
+		    curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$webhook" 1>/dev/null
 	    done
-	  fi
       fi
 	
       if [ "$SEND_DM_ALARM" = "1" ] && [ -n "$ALARM_BOT_API_KEY" ] && [ -n "$ALARM_BOT_EMAIL" ] && [ -n "$ALARM_BOT_API_URL" ] && [ -n "$ALARM_BOT_USER_EMAILS" ]; then
