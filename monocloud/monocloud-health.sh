@@ -434,7 +434,7 @@ report_status() {
     local underthreshold_disk=0
     local REDMINE_CLOSE=1
     local REDMINE_SEND_UPDATE=0
-    message="{\"text\": \"[Mono Cloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    message="Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table_md="$(printf '|%s |%s |%s |%s |%s |' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table_md+="\n"
@@ -467,7 +467,7 @@ report_status() {
                 rm -f /tmp/monocloud-health/${mountpoint//\//_}
             }
         done
-        message+="$table\n\`\`\`\"}"
+        message+="$table\n\`\`\`"
 
         if [[ "$underthreshold_disk" == "$diskcount" && "${REDMINE_ENABLE:-1}" == "1" && -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
             curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Disk kullanım oranları, %$PART_USE_LIMIT altına geri indiği için iş kapatılıyor\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\", \"assigned_to_id\": \"me\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
@@ -477,12 +477,12 @@ report_status() {
         IFS=$oldifs
         #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Underthreshold today..."; }
         if [[ "$underthreshold_disk" -ge 1 ]]; then
-            curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
+            alarm_check_up "disk" "$message"
         fi
     fi
 
     local overthreshold_disk=0
-    message="{\"text\": \"[Mono Cloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    message="Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table_md="$(printf '|%s |%s |%s |%s |%s |' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table_md+="\n"
     table_md+="|--|--|--|--|--|"
@@ -539,11 +539,11 @@ report_status() {
                 fi
                 message+="\n\`\`\`\n"
                 message+="Redmine issue: $REDMINE_URL/issues/$(cat /tmp/monocloud-health/redmine_issue_id)"
-                message+="\n\"}"
+                message+="\n"
             else
-                message+="\n\`\`\`\"}"
+                message+="\n\`\`\`"
             fi
-            curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$ALARM_WEBHOOK_URL"
+            alarm_check_down "disk" "$message" 
         else
             echo "There's no alarm for Overthreshold (DISK) today..."
         fi
