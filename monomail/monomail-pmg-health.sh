@@ -68,12 +68,6 @@ function alarm() {
       fi
   }
 
-function alarm() {
-    if [ "$SEND_ALARM" == "1" ]; then
-        curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
-    fi
-}
-
 function get_time_diff() {
     [[ -z $1 ]] && {
         echo "Service name is not defined"
