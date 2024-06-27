@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of pmg and related services
 
-VERSION=v0.1.0
+VERSION=v1.0.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -10,12 +10,21 @@ VERSION=v0.1.0
 
 mkdir -p /tmp/monomail-pmg-health
 
-if [[ -f /etc/monomail-pmg-health.conf ]]; then
-    . /etc/monomail-pmg-health.conf
-else
-    echo "Config file doesn't exists at /etc/monomail-pmg-health.conf"
-    exit 1
-fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_config_pmg() {
+    CONFIG_PATH_PMG="mail"
+    export REQUIRED=true
+    
+    QUEUE_LIMIT=$(yaml .pmg.queue_limit $CONFIG_PATH_PMG)
+
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_POSTAL "$SEND_ALARM")
+}
+
+parse_config_pmg
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3

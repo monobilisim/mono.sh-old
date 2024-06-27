@@ -1,7 +1,7 @@
 #!/bin/bash
 ###~ description: This script checks zimbra and zextras health
 
-VERSION=v0.8.0
+VERSION=v1.0.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -10,12 +10,24 @@ VERSION=v0.8.0
 
 mkdir -p /tmp/monomail-zimbra-health
 
-if [[ -f /etc/monomail-zimbra-health.conf ]]; then
-    . /etc/monomail-zimbra-health.conf
-else
-    echo "Config file doesn't exists at /etc/monomail-zimbra-health.conf"
-    exit 1
-fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_config_zimbra() {
+    CONFIG_PATH_ZIMBRA="mail"
+    export REQUIRED=true
+
+    RESTART=$(yaml .zimbra.restart $CONFIG_PATH_ZIMBRA)
+    RESTART_LIMIT=$(yaml .zimbra.restart_limit $CONFIG_PATH_ZIMBRA)
+    QUEUE_LIMIT=$(yaml .zimbra.queue_limit $CONFIG_PATH_ZIMBRA)
+    Z_URL=$(yaml .zimbra.z_url $CONFIG_PATH_ZIMBRA)
+    
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_ZIMBRA "$SEND_ALARM")
+}
+
+parse_config_zimbra
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3

@@ -1,7 +1,7 @@
 #!/bin/bash
 ###~ description: Checks the status of postal and related services
 
-VERSION=v1.1.0
+VERSION=v2.0.0
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
@@ -12,27 +12,24 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 mkdir -p /tmp/monomail-postal-health
 
-if [[ -f /etc/monomail-postal-health.conf ]]; then
-    . /etc/monomail-postal-health.conf
-else
-    echo "Config file doesn't exists at /etc/monomail-postal-health.conf"
-    exit 1
-fi
 
-# https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
-if [ -z "$(command -v yq)" ]; then
-    read -p "Couldn't find github.com/mikefarah/yq Want me to download and put it under /usr/local/bin? [y/n]: " yn
-    case $yn in
-    [Yy]*)
-	    curl -sL $(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64') --output /usr/local/bin/yq
-	    chmod +x /usr/local/bin/yq
-        ;;
-    [Nn]*)
-        echo "Aborted"
-        exit 1
-        ;;
-    esac
-fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_config_postal() {
+    CONFIG_PATH_POSTAL="mail"
+    export REQUIRED=true
+
+    message_threshold=$(yaml .postal.message_threshold $CONFIG_PATH_POSTAL)
+    held_threshold=$(yaml .postal.held_threshold $CONFIG_PATH_POSTAL)
+
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_POSTAL "$SEND_ALARM")
+}
+
+parse_config_postal
+
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
