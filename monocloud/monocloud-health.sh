@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v4.3.10"
+script_version="v5.0.0"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -27,6 +27,29 @@ fi
 
 mkdir -p /tmp/monocloud-health
 
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_monocloud() {
+    CONFIG_PATH_MONOCLOUD="os.yml"
+    export REQUIRED=true
+
+    readarray -t FILESYSTEMS < <(yaml .filesystems[] "$CONFIG_PATH_MONOCLOUD")
+    
+    SYSTEM_LOAD_AND_RAM=$(yaml .system_load_and_ram $CONFIG_PATH_MONOCLOUD 1)
+    
+    DYNAMIC_LIMIT_INTERVAL=$(yaml .dynamic_limit_interval $CONFIG_PATH_MONOCLOUD 0)
+    LOAD_LIMIT_MULTIPLIER=$(yaml .load.limit_multiplier $CONFIG_PATH_MONOCLOUD 0.8)
+    
+    PART_USE_LIMIT=$(yaml .part_use_limit $CONFIG_PATH_MONOCLOUD)
+    LOAD_LIMIT=$(yaml .load.limit $CONFIG_PATH_MONOCLOUD 20)
+    RAM_LIMIT=$(yaml .ram_limit $CONFIG_PATH_MONOCLOUD)
+
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONOCLOUD $SEND_ALARM)
+}
+
 grep_custom() {
     if command -v pcregrep &>/dev/null; then
         pcregrep $@
@@ -35,37 +58,9 @@ grep_custom() {
     fi
 }
 
-#~ check configuration file
-check_config_file() {
-    [[ ! -f "$@" ]] && {
-        echo "File \"$@\" does not exist, exiting..."
-        exit 1
-    }
-    . "$@"
-    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT)
-    
-    if [[ -z "$ALARM_WEBHOOK_URL" && -z "$ALARM_WEBHOOK_URLS" ]]; then
-            echo "ALARM_WEBHOOK_URL nor ALARM_WEBHOOK_URLS is not set in \"$@\". exiting..."
-            exit 1
-    fi
-
-    if [[ "$REDMINE_ENABLE" == "1" ]]; then
-        required_vars+=(REDMINE_URL REDMINE_API_KEY)
-    fi
-
-    for var in "${required_vars[@]}"; do
-        [[ -z "${!var}" ]] && {
-            echo "Variable \"$var\" is not set in \"$@\". exiting..."
-            exit 1
-        }
-    done
-    return 0
-}
 
 function alarm() {
-    if [ -z "$ALARM_WEBHOOK_URLS" ]; then
-        curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$ALARM_WEBHOOK_URL" 1>/dev/null
-    else
+    if [[ "$SEND_ALARM" == "1" ]]; then
         for webhook in "${ALARM_WEBHOOK_URLS[@]}"; do
             curl -fsSL -X POST -H "Content-Type: application/json" -d "{\"text\": \"$1\"}" "$webhook" 1>/dev/null
         done
@@ -578,8 +573,6 @@ validate() {
 main() {
     mkdir -p /tmp/monocloud-health
 
-    CONFIG_PATH="/etc/monocloud-health.conf"
-
     if [ "$1" == "--debug" ] || [ "$1" == "-d" ]; then
         set -x
         shift
@@ -601,7 +594,7 @@ main() {
         CONFIG_PATH="$config_path_tmp"
     fi
 
-    check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
+    parse_monocloud
 
     export LOAD_LIMIT_CPU="$(echo "$(nproc) * ${LOAD_LIMIT_MULTIPLIER:-1}" | bc) "
 

@@ -17,4 +17,5 @@ load:
 
 ram_limit: 91
 
-#send_alarm: false
+alarm:
+  enabled: true
