@@ -6,16 +6,17 @@
 
 CONFIG_PATH=/etc/mono.sh
 
-if [[ -f $CONFIG_PATH/main.yaml ]]; then
-    CONFIG_PATH_COMMON="main.yaml"
-elif [[ -f $CONFIG_PATH/main.yml ]]; then
-    CONFIG_PATH_COMMON="main.yml"
-elif [[ -z $CONFIG_PATH_COMMON ]]; then
-    echo "common.sh: Config file not found"
-    exit 1
-fi
-
 function yaml() {
+    
+    if [[ "$CONFIG_PATH"/$2.yaml ]]; then
+        CONFIG_PATH_DATA="$2.yaml"
+    elif [[ "$CONFIG_PATH"/$2.yml ]]; then
+        CONFIG_PATH_DATA="$2.yml"
+    else
+        echo "Config file $CONFIG_PATH/$2.yaml nor $CONFIG_PATH/$2.yml not found"
+        exit 1
+    fi
+
     OUTPUT=$(yq "$1" $CONFIG_PATH/"$2")
 
     case $OUTPUT in
@@ -69,26 +70,26 @@ function check_yq() {
 
 function parse_common() {
     # Alarm
-    readarray -t ALARM_WEBHOOK_URLS < <(yaml .alarm.webhook_urls[] "$CONFIG_PATH_COMMON")
-    IDENTIFIER="$(yaml .identifier "$CONFIG_PATH_COMMON")"
-    SEND_ALARM="$(yaml '.send_alarm' "$CONFIG_PATH_COMMON" 1)"
+    readarray -t ALARM_WEBHOOK_URLS < <(yaml .alarm.webhook_urls[] "main")
+    IDENTIFIER="$(yaml .identifier "main")"
+    SEND_ALARM="$(yaml '.send_alarm' "main" 1)"
 
     ## Bot
-    SEND_DM_ALARM="$(yaml '.alarm.bot.enabled' "$CONFIG_PATH_COMMON" 0)"
-    ALARM_BOT_API_URL="$(yaml .alarm.bot.alarm_url "$CONFIG_PATH_COMMON")"
-    ALARM_BOT_EMAIL="$(yaml .alarm.bot.email "$CONFIG_PATH_COMMON")"
-    ALARM_BOT_API_KEY="$(yaml .alarm.bot.api_key "$CONFIG_PATH_COMMON")"
-    readarray -t ALARM_BOT_USER_EMAILS < <(yaml .alarm.bot.user_emails[] "$CONFIG_PATH_COMMON")
+    SEND_DM_ALARM="$(yaml '.alarm.bot.enabled' "main" 0)"
+    ALARM_BOT_API_URL="$(yaml .alarm.bot.alarm_url "main")"
+    ALARM_BOT_EMAIL="$(yaml .alarm.bot.email "main")"
+    ALARM_BOT_API_KEY="$(yaml .alarm.bot.api_key "main")"
+    readarray -t ALARM_BOT_USER_EMAILS < <(yaml .alarm.bot.user_emails[] "main")
 
     ## Redmine (WIP)
-    REDMINE_API_KEY="$(yaml .redmine.api_key "$CONFIG_PATH_COMMON")"
-    REDMINE_URL="$(yaml .redmine.url "$CONFIG_PATH_COMMON")"
-    REDMINE_ENABLE="$(yaml '.redmine.enabled' "$CONFIG_PATH_COMMON" 1)"
-    REDMINE_PROJECT_ID="$(yaml .redmine.project_id "$CONFIG_PATH_COMMON")"
-    REDMINE_TRACKER_ID="$(yaml .redmine.tracker_id "$CONFIG_PATH_COMMON")"
-    REDMINE_PRIORITY_ID="$(yaml .redmine.priority_id "$CONFIG_PATH_COMMON")"
-    REDMINE_STATUS_ID="$(yaml .redmine.status_id "$CONFIG_PATH_COMMON")"
-    REDMINE_STATUS_ID_CLOSED="$(yaml .redmine.status_id_closed "$CONFIG_PATH_COMMON")"
+    REDMINE_API_KEY="$(yaml .redmine.api_key "main")"
+    REDMINE_URL="$(yaml .redmine.url "main")"
+    REDMINE_ENABLE="$(yaml '.redmine.enabled' "main" 1)"
+    REDMINE_PROJECT_ID="$(yaml .redmine.project_id "main")"
+    REDMINE_TRACKER_ID="$(yaml .redmine.tracker_id "main")"
+    REDMINE_PRIORITY_ID="$(yaml .redmine.priority_id "main")"
+    REDMINE_STATUS_ID="$(yaml .redmine.status_id "main")"
+    REDMINE_STATUS_ID_CLOSED="$(yaml .redmine.status_id_closed "main")"
 }
 
 check_yq

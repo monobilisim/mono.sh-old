@@ -22,7 +22,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
 . "$SCRIPTPATH"/common.sh
 
 parse_config_monok8s_s3() {
-    CONFIG_PATH_MONOK8S="k8s.yml"
+    CONFIG_PATH_MONOK8S="k8s"
     export REQUIRED=true
 
     readarray -t K8S_LOG_LIST < <(yaml .k8s.log_list[] "$CONFIG_PATH_MONOK8S")

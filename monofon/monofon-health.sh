@@ -12,7 +12,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 . "$SCRIPTPATH"/common.sh
 
 parse_config_monofon() {
-    CONFIG_PATH_MONOFON="monofon.yml"
+    CONFIG_PATH_MONOFON="monofon"
     export REQUIRED=true
 
     readarray -t IGNORED_SERVICES < <(yaml .ignored_services[] $CONFIG_PATH_MONOFON)

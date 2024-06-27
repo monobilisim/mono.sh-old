@@ -20,7 +20,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
 . "$SCRIPTPATH"/common.sh
 
 parse_config_monok8s() {
-    CONFIG_PATH_MONOK8S="k8s.yml"
+    CONFIG_PATH_MONOK8S="k8s"
     export REQUIRED=true
 
     readarray -t K8S_FLOATING_IPS < <(yaml .k8s.floating_ips[] "$CONFIG_PATH_MONOK8S")

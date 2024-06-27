@@ -17,7 +17,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 . "$SCRIPTPATH"/common.sh
 
 parse_config_pgsql() {
-    CONFIG_PATH_MONODB="db.yml"
+    CONFIG_PATH_MONODB="db"
     export REQUIRED=true
 
     PROCESS_LIMIT=$(yaml .limits.process $CONFIG_PATH_MONODB)

@@ -33,7 +33,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 . "$SCRIPTPATH"/common.sh
 
 parse_monocloud() {
-    CONFIG_PATH_MONOCLOUD="os.yml"
+    CONFIG_PATH_MONOCLOUD="os"
     export REQUIRED=true
 
     readarray -t FILESYSTEMS < <(yaml .filesystems[] "$CONFIG_PATH_MONOCLOUD")

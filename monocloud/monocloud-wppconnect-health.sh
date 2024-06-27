@@ -18,7 +18,7 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 . "$SCRIPTPATH"/common.sh
 
 parse_wppconnect() {
-    CONFIG_PATH_WPPCONNECT="wppconnect.yml"
+    CONFIG_PATH_WPPCONNECT="wppconnect"
     export REQUIRED=true
     
     WPP_SECRET=$(yaml .system_load_and_ram "$CONFIG_PATH_WPPCONNECT")    
