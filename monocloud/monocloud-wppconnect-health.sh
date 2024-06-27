@@ -3,7 +3,7 @@
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-VERSION=v0.2.0
+VERSION=v1.0.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -12,12 +12,22 @@ VERSION=v0.2.0
 
 mkdir -p /tmp/monocloud-wppconnect
 
-if [[ -f /etc/monocloud-wppconnect-health.conf ]]; then
-    . /etc/monocloud-wppconnect-health.conf
-else
-    echo "Config file doesn't exists at /etc/monocloud-wppconnect-health.conf"
-    exit 1
-fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_wppconnect() {
+    CONFIG_PATH_WPPCONNECT="wppconnect.yml"
+    export REQUIRED=true
+    
+    WPP_SECRET=$(yaml .system_load_and_ram "$CONFIG_PATH_WPPCONNECT")    
+    WPP_URL=$(yaml .dynamic_limit_interval "$CONFIG_PATH_WPPCONNECT")
+
+    SEND_ALARM=$(yaml .alarm.enabled "$CONFIG_PATH_WPPCONNECT" "$SEND_ALARM")
+}
+
+parse_wppconnect
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
