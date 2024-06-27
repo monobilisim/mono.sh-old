@@ -7,7 +7,7 @@ if [[ "$1" == "--version" ]] || [[ "$1" == "-v" ]]; then
     exit 0 
 fi
 
-trap 'rm -f /tmp/caddy-lb-policy-switch.json && exit' INT
+trap 'rm -f /tmp/caddy-lb-policy-lock && exit' INT
 
 function debug() {
     if [[ "$DEBUG" -eq 1 ]]; then
@@ -188,7 +188,7 @@ function change_upstreams() {
                 echo "Sending request to change upstreams"
                 
                 if curl -u "$USERNAME_PASSWORD" -X PATCH -H "Content-Type: application/json" -d "$REQ_TO_SEND" "$REQ_URL" 2> /tmp/caddy-lb-policy-switch-error.log; then
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched upstreams to $1"
+                    echo "[$IDENTIFIER] [$URL_TO_FIND] Switched upstreams to $1"
                 else
                     alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch upstreams to $1\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
                 fi
@@ -219,7 +219,7 @@ function change_upstreams() {
             else
                 echo "Sending request to change lb_policy to $1"
                 if curl -u "$USERNAME_PASSWORD" -X PATCH -H "Content-Type: application/json" -d "$REQ_TO_SEND" "$REQ_URL" 2> /tmp/caddy-lb-policy-switch-error.log; then
-                    alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:check:] Switched lb_policy to $1"
+                    echo "[$IDENTIFIER] [$URL_TO_FIND] Switched lb_policy to $1"
                 else
                     alarm "[Caddy lb-policy Switch] [$IDENTIFIER] [$URL_TO_FIND] [:red_circle:] Failed to switch lb_policy to $1\nError log: \`\`\`\n$(cat /tmp/caddy-lb-policy-switch-error.log)\n\`\`\`"
                 fi
@@ -317,17 +317,39 @@ function main() {
     fi
     
     if [[ "$LOOP_ORDER" == "SERVERS" ]]; then
+        bad_urls=()
+        slept_for=0
+        start_func="$(date +%s)"
         for URL_TO_FIND in "${CADDY_SERVERS[@]}"; do
             for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
                 URL="${URL_UP#*@}"
                 USERNAME_PASSWORD="${URL_UP%%@*}"
                 echo '---------------------------------'
                 echo "Checking '$URL_TO_FIND' on '$URL'"
-                identify_request "$1" "$2"
+                identify_request "$1" "$2" || bad_urls+=("$URL")
                 echo '---------------------------------'
+
             done
             sleep "${LB_POLICY_CHANGE_SLEEP:-1}"
+            slept_for=$((slept_for+LB_POLICY_CHANGE_SLEEP))
         done
+        end_func="$(date +%s)"
+        
+        CADDY_SERVERS_WO_BAD=("${CADDY_SERVERS[@]}")
+
+        for i in "${bad_urls[@]}"; do
+            CADDY_SERVERS_WO_BAD=("${CADDY_SERVERS_WO_BAD[@]/$i}")
+        done
+
+        debug "CADDY_SERVERS_WO_BAD: ${CADDY_SERVERS_WO_BAD[*]}"
+
+        CADDY_SERVERS_WO_BAD_HUMANREADABLE="${CADDY_SERVERS_WO_BAD[*]// /, }"
+        bad_urls_humanreadable="${bad_urls[*]// /, }"
+
+        alarm "$CADDY_SERVERS_WO_BAD_HUMANREADABLE switched to upstream $1 in $((end_func-start_func)) seconds, slept for $slept_for seconds"
+        if [[ ${#bad_urls[@]} -ne 0 ]]; then
+            alarm "$bad_urls_humanreadable failed to switch upstreams to $1"
+        fi
     else
         for URL_UP in "${CADDY_API_URLS_NEW[@]}"; do
             URL="${URL_UP#*@}"
@@ -342,6 +364,8 @@ function main() {
         done
     fi 
 }
+
+rm -f /tmp/caddy-lb-policy-switch.json
 
 if [[ "$USE_ENV" -eq 1 ]]; then
     main "$1" "$2"
@@ -363,3 +387,4 @@ fi
 end="$(date +%s)"
 runtime=$((end-start))
 echo "Script runtime: $runtime seconds"
+rm -f /tmp/caddy-lb-policy-lock

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v4.3.9"
+script_version="v4.3.11"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -29,9 +29,9 @@ mkdir -p /tmp/monocloud-health
 
 grep_custom() {
     if command -v pcregrep &>/dev/null; then
-	pcregrep $@
+        pcregrep $@
     else
-	grep -P $@
+        grep -P $@
     fi
 }
 
@@ -42,7 +42,17 @@ check_config_file() {
         exit 1
     }
     . "$@"
-    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT ALARM_WEBHOOK_URL REDMINE_URL REDMINE_API_KEY)
+    local required_vars=(FILESYSTEMS PART_USE_LIMIT LOAD_LIMIT RAM_LIMIT)
+    
+    if [[ -z "$ALARM_WEBHOOK_URL" && -z "$ALARM_WEBHOOK_URLS" ]]; then
+            echo "ALARM_WEBHOOK_URL nor ALARM_WEBHOOK_URLS is not set in \"$@\". exiting..."
+            exit 1
+    fi
+
+    if [[ "$REDMINE_ENABLE" == "1" ]]; then
+        required_vars+=(REDMINE_URL REDMINE_API_KEY)
+    fi
+
     for var in "${required_vars[@]}"; do
         [[ -z "${!var}" ]] && {
             echo "Variable \"$var\" is not set in \"$@\". exiting..."
@@ -83,14 +93,14 @@ function get_time_diff() {
 
     if [ -f "${file_path}" ]; then
 
-	old_date=$(awk '{print $1, $2}' <"${file_path}")
-	if [ "$(uname -s | tr '[:upper:]' '[:lower:]')" == "freebsd" ]; then
-	    old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
-	    new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
-	else
-	    old=$(date -d "$old_date" "+%s")
-	    new=$(date "+%s")
-	fi
+        old_date=$(awk '{print $1, $2}' <"${file_path}")
+        if [ "$(uname -s | tr '[:upper:]' '[:lower:]')" == "freebsd" ]; then
+            old=$(date -j -f "%Y-%m-%d %H:%M" "$old_date" "+%s")
+            new=$(date -j -f "%Y-%m-%d %H:%M" "$(date '+%Y-%m-%d %H:%M')" "+%s")
+        else
+            old=$(date -d "$old_date" "+%s")
+            new=$(date "+%s")
+        fi
 
         time_diff=$(((new - old) / 60))
 
@@ -186,31 +196,31 @@ check_partitions() {
         local mountpoint="${info[2]}"
         if [[ "${FILESYSTEMS[@]}" =~ "$filesystem" ]]; then
             case $filesystem in
-		"fuse.zfs")
-		    note="Fuse ZFS is not supported yet."
-		    usage="0"
-		    avail="0"
-		    total="0"
-		    percentage="0"
-		    ;;
-		"zfs")
-		    usage=$(zfs list -H -p -o used "$partition")
-		    avail=$(zfs list -H -p -o avail "$partition")
-		    total=$((usage + avail))
-		    percentage=$((usage * 100 / total))
-		    ;;
-		"btrfs")
-		    usage=$(btrfs fi us -b $mountpoint | grep_custom '^\s.+Used' | awk '{print $2}')
-		    total=$(btrfs fi us -b $mountpoint | grep_custom 'Device size' | awk '{print $3}')
-		    percentage=$(echo "scale=2; $usage / $total * 100" | bc)
-		    ;;
-		*)
-		    stat=($(df -P $mountpoint | sed '1d' | awk '{printf "%s %-12s   %s\n", $3*1024, $2*1024, $5}'))
-		    usage=${stat[0]}
-		    total=${stat[1]}
-		    percentage=${stat[2]}
-		    ;;
-	    esac
+            "fuse.zfs")
+                note="Fuse ZFS is not supported yet."
+                usage="0"
+                avail="0"
+                total="0"
+                percentage="0"
+                ;;
+            "zfs")
+                usage=$(zfs list -H -p -o used "$partition")
+                avail=$(zfs list -H -p -o avail "$partition")
+                total=$((usage + avail))
+                percentage=$((usage * 100 / total))
+                ;;
+            "btrfs")
+                usage=$(btrfs fi us -b $mountpoint | grep_custom '^\s.+Used' | awk '{print $2}')
+                total=$(btrfs fi us -b $mountpoint | grep_custom 'Device size' | awk '{print $3}')
+                percentage=$(echo "scale=2; $usage / $total * 100" | bc)
+                ;;
+            *)
+                stat=($(df -P $mountpoint | sed '1d' | awk '{printf "%s %-12s   %s\n", $3*1024, $2*1024, $5}'))
+                usage=${stat[0]}
+                total=${stat[1]}
+                percentage=${stat[2]}
+                ;;
+            esac
         fi
         [[ "$usage" != "0" ]] && usage=$(convertToProper $usage)
         [[ "$total" != "0" ]] && total=$(convertToProper $total)
@@ -223,40 +233,40 @@ check_partitions() {
 }
 
 function sum_array() {
-	local sum=0
-	for num in $@; do
-		sum=$(echo "$sum + $num" | bc)
-	done
-	echo $sum
+    local sum=0
+    for num in $@; do
+        sum=$(echo "$sum + $num" | bc)
+    done
+    echo $sum
 }
 
 function dynamic_limit() {
     [[ "$DYNAMIC_LIMIT_INTERVAL" -lt 1 ]] && return
-    
+
     [ -d "/tmp/monocloud-health/checks" ] || return
     cd /tmp/monocloud-health/checks
-    
+
     LOAD_LIMIT_ARRAY=()
     RAM_LIMIT_ARRAY=()
-    
+
     if [ -f "/tmp/monocloud-health/checks/last_ram_limit_dynamic" ]; then
-	export RAM_LIMIT_DYNAMIC="$(cat /tmp/monocloud-health/checks/last_ram_limit_dynamic)"
+        export RAM_LIMIT_DYNAMIC="$(cat /tmp/monocloud-health/checks/last_ram_limit_dynamic)"
     fi
 
     if [[ $(ls -1 *.json | wc -l) -ge $DYNAMIC_LIMIT_INTERVAL ]]; then
-       for file in *.json; do
-           LOAD_LIMIT_ARRAY+=( $(jq -r '.load' $file) )
-           RAM_LIMIT_ARRAY+=( $(jq -r '.ram' $file) )
-       done
-	
-       # Get the average of the array
-       export RAM_LIMIT_DYNAMIC=$(echo "scale=2; ($(sum_array ${RAM_LIMIT_ARRAY[@]}) / ${#RAM_LIMIT_ARRAY[@]})" | bc)  
+        for file in *.json; do
+            LOAD_LIMIT_ARRAY+=($(jq -r '.load' $file))
+            RAM_LIMIT_ARRAY+=($(jq -r '.ram' $file))
+        done
 
-       rm -f /tmp/monocloud-health/checks/*
-       
-       echo "$RAM_LIMIT_DYNAMIC" > /tmp/monocloud-health/checks/last_ram_limit_dynamic
+        # Get the average of the array
+        export RAM_LIMIT_DYNAMIC=$(echo "scale=2; ($(sum_array ${RAM_LIMIT_ARRAY[@]}) / ${#RAM_LIMIT_ARRAY[@]})" | bc)
+
+        rm -f /tmp/monocloud-health/checks/*
+
+        echo "$RAM_LIMIT_DYNAMIC" >/tmp/monocloud-health/checks/last_ram_limit_dynamic
     fi
-    
+
     [ -z "$RAM_LIMIT_DYNAMIC" ] && export RAM_LIMIT_DYNAMIC=$RAM_LIMIT
 
     cd - &>/dev/null
@@ -284,20 +294,20 @@ check_status() {
     printf "\n"
 
     if [[ "${SYSTEM_LOAD_AND_RAM:-1}" -eq 1 ]]; then
-	log_header "System Load and RAM"
-	systemstatus="$(check_system_load_and_ram)"
-    
-    if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT_CPU)") ]]; then
-	    print_colour "System Load" "greater than $LOAD_LIMIT_CPU ($(echo $systemstatus | jq -r '.load'))" "error"
-	else
-	    print_colour "System Load" "less than $LOAD_LIMIT_CPU ($(echo $systemstatus | jq -r '.load'))"
-	fi
+        log_header "System Load and RAM"
+        systemstatus="$(check_system_load_and_ram)"
 
-	if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT})") ]]; then
-	    print_colour "RAM Usage" "greater than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))" "error"
-	else
-	    print_colour "RAM Usage" "less than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))"
-	fi
+        if [[ -n $(echo $systemstatus | jq -r ". | select(.load | tonumber > $LOAD_LIMIT_CPU)") ]]; then
+            print_colour "System Load" "greater than $LOAD_LIMIT_CPU ($(echo $systemstatus | jq -r '.load'))" "error"
+        else
+            print_colour "System Load" "less than $LOAD_LIMIT_CPU ($(echo $systemstatus | jq -r '.load'))"
+        fi
+
+        if [[ -n $(echo $systemstatus | jq -r ". | select(.ram | tonumber > ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT})") ]]; then
+            print_colour "RAM Usage" "greater than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))" "error"
+        else
+            print_colour "RAM Usage" "less than ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} ($(echo $systemstatus | jq -r '.ram'))"
+        fi
     fi
 
     printf "\n"
@@ -306,20 +316,20 @@ check_status() {
 }
 
 freebsd_mib() {
-	if [[ "$1" == "vmstat" ]]; then
-	    local bytes="$(echo "$(vmstat_jq "$2") * 1024" | bc)"
-	else
-	    local bytes="$(sysctl -n $1)"
-	fi
-	local mib=$(echo "($bytes + 524288) / 1048576" | bc)  # Round to the nearest MiB
-	echo "$mib"
+    if [[ "$1" == "vmstat" ]]; then
+        local bytes="$(echo "$(vmstat_jq "$2") * 1024" | bc)"
+    else
+        local bytes="$(sysctl -n $1)"
+    fi
+    local mib=$(echo "($bytes + 524288) / 1048576" | bc) # Round to the nearest MiB
+    echo "$mib"
 }
 
 free_custom() {
-    
+
     if command -v free &>/dev/null; then
-		free -m "$@"
-		return $?
+        free -m "$@"
+        return $?
     fi
 
     # Mem: Total, Used, Free, Shared, Buff/Cache, Available
@@ -337,8 +347,7 @@ check_system_load_and_ram() {
     [[ $is_old == 0 ]] && ram_usage=$(free_custom | awk '/Mem/{printf("%.2f", $3/$2*100)}') || ram_usage=$(free_custom | awk '/Mem/{printf("%.2f", ($3-$6-$7)/$2*100)}')
     local json="{\"load\":\"$load\",\"ram\":\"$ram_usage\"}"
 
-    
-    if [[ $(echo "$load <= $LOAD_LIMIT_CPU" | bc -l) -eq 1 ]] ; then
+    if [[ $(echo "$load <= $LOAD_LIMIT_CPU" | bc -l) -eq 1 ]]; then
         message="System load limit went below $LOAD_LIMIT_CPU (Current: $load, Multiplier: $LOAD_LIMIT_MULTIPLIER, CPU: $(nproc))"
         alarm_check_up "load" "$message" "system"
     else
@@ -346,13 +355,13 @@ check_system_load_and_ram() {
         alarm_check_down "load" "$message" "system"
     fi
 
-    ram_u=$(echo "$ram_usage" | awk -F  '.' '{print $1}') 
-    
+    ram_u=$(echo "$ram_usage" | awk -F '.' '{print $1}')
+
     if [[ "$ram_u" == "$ram_usage" ]]; then
-	ram_u=$(echo "$ram_usage" | awk -F  ',' '{print $1}')
+        ram_u=$(echo "$ram_usage" | awk -F ',' '{print $1}')
     fi
-    
-    if [[ $(echo "$ram_usage <= ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT}" | bc -l) -eq 1 ]] ; then
+
+    if [[ $(echo "$ram_usage <= ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT}" | bc -l) -eq 1 ]]; then
         message="RAM usage limit went below ${RAM_LIMIT_DYNAMIC:-$RAM_LIMIT} (Current: $ram_usage%)"
         alarm_check_up "ram" "$message" "system"
     else
@@ -361,7 +370,7 @@ check_system_load_and_ram() {
     fi
 
     [ ! -d "/tmp/monocloud-health/checks" ] && mkdir -p /tmp/monocloud-health/checks
-    echo $json > /tmp/monocloud-health/checks/$(date +%s).json
+    echo $json >/tmp/monocloud-health/checks/$(date +%s).json
 
     echo $json
 }
@@ -418,18 +427,20 @@ print_colour() {
 
 report_status() {
     local diskstatus="$(check_partitions)"
+    echo $diskstatus
     [[ "${SYSTEM_LOAD_AND_RAM:-1}" -eq 1 ]] && local systemstatus="$(check_system_load_and_ram)"
     [[ -n "$IDENTIFIER" ]] && alarm_hostname=$IDENTIFIER || alarm_hostname="$(hostname)"
 
     local underthreshold_disk=0
     local REDMINE_CLOSE=1
     local REDMINE_SEND_UPDATE=0
-    message="{\"text\": \"[Mono Cloud - $alarm_hostname] [✅] Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    message="Partition usage levels went below ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table_md="$(printf '|%s |%s |%s |%s |%s |' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table="$(printf '%-5s | %-10s | %-10s | %-50s | %s' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table_md+="\n"
     table_md+="|--|--|--|--|--|"
     table+='\n'
+    local diskcount="$(echo $diskstatus | jq -r '.[].partition' | wc -l)"
     for z in $(seq 1 110); do table+="$(printf '-')"; done
     if [[ -n "$(echo $diskstatus | jq -r ".[] | select(.percentage | tonumber < $PART_USE_LIMIT)")" ]]; then
         local oldifs=$IFS
@@ -443,32 +454,35 @@ report_status() {
             mountpoint=${a[4]}
 
             [[ "$mountpoint" == "/" ]] && mountpoint="/sys_root"
+
+            if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}-redmine" ]]; then
+                curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"${partition}, %$PART_USE_LIMIT altına geri indi.\"}}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json 
+                rm -f "/tmp/monocloud-health/${mountpoint//\//_}-redmine"
+            fi
+            
             [[ -f "/tmp/monocloud-health/${mountpoint//\//_}" ]] && {
-		table_md+="\n$(printf '| %s | %s | %s | %s | %s |\n' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
+                table_md+="\n$(printf '| %s | %s | %s | %s | %s |\n' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
                 table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
-                underthreshold_disk=1
+                underthreshold_disk=$((underthreshold_disk + 1))
                 rm -f /tmp/monocloud-health/${mountpoint//\//_}
             }
-	    if [[ -f "/tmp/monocloud-health/redmine_issue_id" && $percentage -ge $((PART_USE_LIMIT - ${REDMINE_ISSUE_DELETE_THRESHOLD:-5})) ]]; then
-		REDMINE_CLOSE=0
-	    fi
         done
-        message+="$table\n\`\`\`\"}"
+        message+="$table\n\`\`\`"
+
+        if [[ "$underthreshold_disk" == "$diskcount" && "${REDMINE_ENABLE:-1}" == "1" && -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
+            curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Disk kullanım oranları, %$PART_USE_LIMIT altına geri indiği için iş kapatılıyor\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\", \"assigned_to_id\": \"me\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+            rm -f /tmp/monocloud-health/redmine_issue_id
+        fi
+
         IFS=$oldifs
         #[[ "$underthreshold_disk" == "1" ]] && echo $message || { echo "There's no alarm for Underthreshold today..."; }
-        if [[ "$underthreshold_disk" == "1" ]]; then
-	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$WEBHOOK_URL" || { echo "There's no alarm for Underthreshold (DISK) today."; }
-	    if [[ "${REDMINE_ENABLE:-1}" == "1" && -f "/tmp/monocloud-health/redmine_issue_id" && "$REDMINE_CLOSE" == "1" ]]; then
-		# Delete issue
-		#curl -fsSL -X DELETE -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
-		curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"Disk kullanım oranı %$percentage, %$PART_USE_LIMIT altına geri indiği için iş kapatılıyor\", \"status_id\": \"${REDMINE_STATUS_ID_CLOSED:-5}\", \"assigned_to_id\": \"me\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
-		rm -f /tmp/monocloud-health/redmine_issue_id
-	    fi
-	fi
+        if [[ "$underthreshold_disk" -ge 1 ]]; then
+            alarm_check_up "disk" "$message"
+        fi
     fi
 
     local overthreshold_disk=0
-    message="{\"text\": \"[Mono Cloud - $alarm_hostname] [🔴] Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
+    message="Partition usage level has exceeded ${PART_USE_LIMIT}% for the following partitions;\n\`\`\`\n"
     table_md="$(printf '|%s |%s |%s |%s |%s |' '%' 'Used' 'Total' 'Partition' 'Mount Point')"
     table_md+="\n"
     table_md+="|--|--|--|--|--|"
@@ -486,14 +500,14 @@ report_status() {
             mountpoint=${a[4]}
 
             [[ "$mountpoint" == "/" ]] && mountpoint="/sys_root"
-	    
-	    if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}-redmine" && "$(cat /tmp/monocloud-health/${mountpoint//\//_}-redmine)" != "$percentage" ]]; then
-		REDMINE_SEND_UPDATE=1
-	    fi
-	    
-	    echo "$percentage" > /tmp/monocloud-health/${mountpoint//\//_}-redmine
-            
-	    if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}" ]]; then
+
+            if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}-redmine" && "$(cat /tmp/monocloud-health/${mountpoint//\//_}-redmine)" != "$percentage" ]]; then
+                REDMINE_SEND_UPDATE=1
+            fi
+
+            echo "$percentage" >/tmp/monocloud-health/${mountpoint//\//_}-redmine
+
+            if [[ -f "/tmp/monocloud-health/${mountpoint//\//_}" ]]; then
                 if [[ "$(cat /tmp/monocloud-health/${mountpoint//\//_})" == "$(date +%Y-%m-%d)" ]]; then
                     overthreshold_disk=0
                     continue
@@ -506,31 +520,33 @@ report_status() {
                 overthreshold_disk=1
             fi
 
- 
             table_md+="\n$(printf '| %s | %s | %s | %s | %s |' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
             table+="\n$(printf '%-5s | %-10s | %-10s | %-50s | %-35s' $percentage% $usage $total $partition ${mountpoint//sys_root/})"
         done
         IFS=$oldifs
         if [[ "$overthreshold_disk" == "1" ]]; then
             message+="$table\n\n"
- 
-	    if [ "${REDMINE_ENABLE:-1}" == "1" ]; then
-		    if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
 
-		        curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"${REDMINE_PROJECT_ID:-$(echo $IDENTIFIER | cut -d '-' -f 1)}\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} üstüne çıktı\", \"description\": \"$table_md\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
-		        echo "$"
-		        jq -r '.issue.id' /tmp/monocloud-health/redmine.json > /tmp/monocloud-health/redmine_issue_id
-		        rm -f /tmp/monocloud-health/redmine.json
-            elif [[ "$REDMINE_SEND_UPDATE" == "1" ]]; then
-		        curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"$table_md\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
-		    fi
-		    message="Redmine issue: $REDMINE_URL/issues/$(cat /tmp/monocloud-health/redmine_issue_id)"
+            if [ "${REDMINE_ENABLE:-1}" == "1" ]; then
+                if [[ ! -f "/tmp/monocloud-health/redmine_issue_id" ]]; then
+
+                    curl -fsSL -X POST -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"project_id\": \"${REDMINE_PROJECT_ID:-$(echo $IDENTIFIER | cut -d '-' -f 1)}\", \"tracker_id\": \"${REDMINE_TRACKER_ID:-7}\", \"subject\": \"$alarm_hostname - Diskteki bir (ya da birden fazla) bölümün doluluk seviyesi %${PART_USE_LIMIT} üstüne çıktı\", \"description\": \"$table_md\", \"status_id\": \"${REDMINE_STATUS_ID:-open}\", \"priority_id\": \"${REDMINE_PRIORITY_ID:-5}\" }}" "$REDMINE_URL"/issues.json -o /tmp/monocloud-health/redmine.json
+                    echo "$"
+                    jq -r '.issue.id' /tmp/monocloud-health/redmine.json >/tmp/monocloud-health/redmine_issue_id
+                    rm -f /tmp/monocloud-health/redmine.json
+                elif [[ "$REDMINE_SEND_UPDATE" == "1" ]]; then
+                    curl -fsSL -X PUT -H "Content-Type: application/json" -H "X-Redmine-API-Key: $REDMINE_API_KEY" -d "{\"issue\": { \"id\": $(cat /tmp/monocloud-health/redmine_issue_id), \"notes\": \"$table_md\" }}" "$REDMINE_URL"/issues/$(cat /tmp/monocloud-health/redmine_issue_id).json
+                fi
+                message+="\n\`\`\`\n"
+                message+="Redmine issue: $REDMINE_URL/issues/$(cat /tmp/monocloud-health/redmine_issue_id)"
+                message+="\n"
+            else
+                message+="\n\`\`\`"
+            fi
+            alarm_check_down "disk" "$message" 
+        else
+            echo "There's no alarm for Overthreshold (DISK) today..."
         fi
-        message+="\n\`\`\`\"}"
-	    curl -fsSL -X POST -H "Content-Type: application/json" -d "$message" "$ALARM_WEBHOOK_URL"
-	else
-	    echo "There's no alarm for Overthreshold (DISK) today..."
-	fi
     fi
 }
 
@@ -561,67 +577,67 @@ validate() {
 #~ main
 main() {
     mkdir -p /tmp/monocloud-health
-    
+
     CONFIG_PATH="/etc/monocloud-health.conf"
-    
+
     if [ "$1" == "--debug" ] || [ "$1" == "-d" ]; then
-		set -x
-		shift
+        set -x
+        shift
     fi
 
     if [[ "$1" == "--config="* ]] || [[ "$1" == "-c="* ]]; then
-	local config_path_tmp="${1#*=}"
-	local config_path_tmp="${config_path_tmp:-false}"
-	shift
-    elif [[ ( "$1" == "--config" || "$1" == "-c" ) && ! "$2" =~ ^- ]]; then	
-	local config_path_tmp="${2:-false}"
-	shift 2
+        local config_path_tmp="${1#*=}"
+        local config_path_tmp="${config_path_tmp:-false}"
+        shift
+    elif [[ ("$1" == "--config" || "$1" == "-c") && ! "$2" =~ ^- ]]; then
+        local config_path_tmp="${2:-false}"
+        shift 2
     fi
 
     if [[ "$config_path_tmp" == "false" ]]; then
-	echo "$0: option requires an argument -- 'config/-c'"
-	shift
+        echo "$0: option requires an argument -- 'config/-c'"
+        shift
     elif [[ -n "$config_path_tmp" ]]; then
-	CONFIG_PATH="$config_path_tmp"
+        CONFIG_PATH="$config_path_tmp"
     fi
-    
+
     check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
-    
-    export LOAD_LIMIT_CPU="$( echo "$(nproc) * ${LOAD_LIMIT_MULTIPLIER:-1}" | bc ) "
-    
+
+    export LOAD_LIMIT_CPU="$(echo "$(nproc) * ${LOAD_LIMIT_MULTIPLIER:-1}" | bc) "
+
     [[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
     [[ -z "$DYNAMIC_LIMIT_INTERVAL" ]] && DYNAMIC_LIMIT_INTERVAL=100
 
     dynamic_limit
 
     [[ $# -eq 0 ]] && {
-	check_status
-	exit 1
+        check_status
+        exit 1
     }
 
     while [[ $# -gt 0 ]]; do
-	case $1 in
-	    -l | --list)
-		check_partitions | jq
-	    ;;  
-	    -V | --validate)
-		validate
+        case $1 in
+        -l | --list)
+            check_partitions | jq
             ;;
-	    -v | --version)
-		echo "Script Version: $script_version"
+        -V | --validate)
+            validate
             ;;
-	    --)
-		shift
-		return 0
+        -v | --version)
+            echo "Script Version: $script_version"
             ;;
-	    -h | --help)
-		usage
-		break
+        --)
+            shift
+            return 0
             ;;
-	esac
+        -h | --help)
+            usage
+            break
+            ;;
+        esac
         _status="$?"
         [[ "${_status}" != "0" ]] && { exit ${_status}; }
-	shift
+        shift
     done
 
 }
