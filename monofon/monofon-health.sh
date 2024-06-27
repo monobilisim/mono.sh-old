@@ -14,8 +14,8 @@ SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 parse_config_monofon() {
     CONFIG_PATH_MONOFON="monofon.yml"
     export REQUIRED=true
-    
-    #IGNORED_SERVICES
+
+    readarray -t IGNORED_SERVICES < <(yaml .ignored_services[] $CONFIG_PATH_MONOFON)
     AUTO_RESTART=$(yaml .restart.auto $CONFIG_PATH_MONOFON)
     CONCURRENT_CALLS=$(yaml .concurrent_calls $CONFIG_PATH_MONOFON)
     TRUNK_CHECK_INTERVAL=$(yaml .trunk_check_interval $CONFIG_PATH_MONOFON)
