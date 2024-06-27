@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Check the health of the mono-k8s cluster
-VERSION="0.3.1"
+VERSION="1.0.0"
 
 RED_FG=$(tput setaf 1)
 GREEN_FG=$(tput setaf 2)
@@ -13,16 +13,23 @@ RESET=$(tput sgr0)
     exit 0
 }
 
-if [[ -f "$MONOK8S_CONFIG_PATH" ]]; then
-    # shellcheck disable=SC1090
-    . "$MONOK8S_CONFIG_PATH"
-elif [[ -f /etc/monok8s-k8s-health.conf ]]; then
-    # shellcheck disable=SC1091
-    . /etc/monok8s-k8s-health.conf
-else
-    echo "Config file doesn't exist at /etc/monok8s-k8s-health.conf"
-    exit 1
-fi
+
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_config_monok8s() {
+    CONFIG_PATH_MONOK8S="k8s.yml"
+    export REQUIRED=true
+
+    readarray -t K8S_FLOATING_IPS < <(yaml .k8s.floating_ips[] "$CONFIG_PATH_MONOK8S")
+    readarray -t INGRESS_FLOATING_IPS < <(yaml .k8s.ingress_floating_ips[] "$CONFIG_PATH_MONOK8S")
+
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONOK8S "$SEND_ALARM")
+}
+
+parse_config_monok8s
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
@@ -47,21 +54,6 @@ done
 if ! command -v kubectl &> /dev/null; then
 	echo "kubectl is not available on PATH. Please add it to PATH."
 	exit 1
-fi
-
-# https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
-if [ -z "$(command -v yq)" ]; then
-    read -r -p "Couldn't find yq. Do you want to download it and put it under /usr/local/bin? [y/n]: " yn
-    case $yn in
-    [Yy]*)
-	curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64')" --output /usr/local/bin/yq
-	chmod +x /usr/local/bin/yq
-	;;
-    [Nn]*)
-        echo "Aborted"
-        exit 1
-        ;;
-    esac
 fi
 
 function print_colour() {
@@ -339,18 +331,18 @@ function check_pods() {
 function check_rke2_ingress_endpoint_response() {
     for namespace in $(kubectl get namespaces | awk '{print $1}' | sed '1d'); do
 	# Get all Ingress resources
-    	ingresses=$(kubectl get ingress -n $namespace -o jsonpath='{.items[*].metadata.name}')
+    	ingresses=$(kubectl get ingress -n "$namespace" -o jsonpath='{.items[*].metadata.name}')
 
     	# Loop through each Ingress
     	for ingress in $ingresses; do
     	  # Get Ingress details (host and paths)
-    	  host=$(kubectl get ingress $ingress -n $namespace -o jsonpath='{.spec.rules[0].host}')
-    	  paths=$(kubectl get ingress $ingress -n $namespace -o jsonpath='{.spec.rules[*].http.paths[*].path}')
+    	  host=$(kubectl get ingress "$ingress" -n "$namespace" -o jsonpath='{.spec.rules[0].host}')
+    	  paths=$(kubectl get ingress "$ingress" -n "$namespace" -o jsonpath='{.spec.rules[*].http.paths[*].path}')
     	
     	  # Loop through each path in the Ingress
     	  for path in $paths; do
     	    # Construct the endpoint URL
-    	    url="http://$(kubectl get ingress $ingress -n $namespace -o jsonpath='{.status.loadBalancer.ingress[*].ip}')$path"
+    	    url="http://$(kubectl get ingress "$ingress" -n "$namespace" -o jsonpath='{.status.loadBalancer.ingress[*].ip}')$path"
     	    
     	    # Get response from the endpoint
     	    response=$(curl -L -s -o /dev/null -w "%{http_code}" -H "Host: $host" "$url")
