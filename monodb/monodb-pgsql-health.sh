@@ -9,34 +9,25 @@ VERSION=v1.1.0
 
 mkdir -p /tmp/monodb-pgsql-health
 
-if [[ -f /etc/monodb-pgsql-health.conf ]]; then
-    . /etc/monodb-pgsql-health.conf
-else
-    echo "Config file doesn't exists at /etc/monodb-pgsql-health.conf"
-    exit 1
-fi
 
-# https://github.com/mikefarah/yq v4.43.1 sürümü ile test edilmiştir
-if [ -z "$(command -v yq)" ]; then
 
-    if [[ "$1" == "--yq" ]]; then
-        echo "Couldn't find yq. Installing it..."
-        yn="y"
-    else
-        read -r -p "Couldn't find yq. Do you want to download it and put it under /usr/local/bin? [y/n]: " yn
-    fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
-    case $yn in
-    [Yy]*)
-        curl -sL "$(curl -s https://api.github.com/repos/mikefarah/yq/releases/latest | grep browser_download_url | cut -d\" -f4 | grep 'yq_linux_amd64' | grep -v 'tar.gz')" --output /usr/local/bin/yq
-        chmod +x /usr/local/bin/yq
-        ;;
-    [Nn]*)
-        echo "Aborted"
-        exit 1
-        ;;
-    esac
-fi
+. "$SCRIPTPATH"/common.sh
+
+parse_config_pgsql() {
+    CONFIG_PATH_MONODB="db.yml"
+    export REQUIRED=true
+
+    PROCESS_LIMIT=$(yaml .limits.process $CONFIG_PATH_MONODB)
+    QUERY_LIMIT=$(yaml .limits.query $CONFIG_PATH_MONODB)
+    CONN_LIMIT_PERCENT=$(yaml .limits.conn_percent $CONFIG_PATH_MONODB)
+
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONODB $SEND_ALARM)
+}
+
+parse_config_pgsql
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3

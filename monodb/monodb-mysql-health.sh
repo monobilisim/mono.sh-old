@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of MySQL and MySQL cluster
-VERSION=v1.0.0
+VERSION=v2.0.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
@@ -9,12 +9,23 @@ VERSION=v1.0.0
 
 mkdir -p /tmp/monodb-mysql-health
 
-if [[ -f /etc/monodb-mysql-health.conf ]]; then
-    . /etc/monodb-mysql-health.conf
-else
-    echo "Config file doesn't exists at /etc/monodb-mysql-health.conf"
-    exit 1
-fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_config_mysql() {
+    CONFIG_PATH_MONODB="db.yml"
+    export REQUIRED=true
+
+    PROCESS_LIMIT=$(yaml .process_limit $CONFIG_PATH_MONODB)
+    CLUSTER_SIZE=$(yaml .cluster.size $CONFIG_PATH_MONODB)
+    IS_CLUSTER=$(yaml .cluster.enabled $CONFIG_PATH_MONODB)
+
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONODB $SEND_ALARM)
+}
+
+parse_config_mysql
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
