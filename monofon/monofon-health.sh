@@ -4,14 +4,28 @@
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 mkdir -p /tmp/monofon-health
 
-VERSION=v1.1.0
+VERSION=v2.0.0
 
-if [[ -f /etc/monofon-health.conf ]]; then
-    . /etc/monofon-health.conf
-else
-    echo "Config file doesn't exists at /etc/monofon-health.conf"
-    exit 1
-fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_config_monofon() {
+    CONFIG_PATH_MONOFON="monofon.yml"
+    export REQUIRED=true
+    
+    #IGNORED_SERVICES
+    AUTO_RESTART=$(yaml .restart.auto $CONFIG_PATH_MONOFON)
+    CONCURRENT_CALLS=$(yaml .concurrent_calls $CONFIG_PATH_MONOFON)
+    TRUNK_CHECK_INTERVAL=$(yaml .trunk_check_interval $CONFIG_PATH_MONOFON)
+    RESTART_ATTEMPT_INTERVAL=$(yaml .restart.attempt_interval $CONFIG_PATH_MONOFON)
+    
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONOFON $SEND_ALARM)
+}
+
+parse_config_monofon
+
 if [ -z "$TRUNK_CHECK_INTERVAL" ]; then
     TRUNK_CHECK_INTERVAL=5
 fi
