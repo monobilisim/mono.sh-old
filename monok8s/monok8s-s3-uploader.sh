@@ -16,12 +16,27 @@ VERSION=v0.1.0
 
 mkdir -p /tmp/monok8s-s3-uploader
 
-if [[ -f /etc/monok8s-s3-uploader.conf ]]; then
-    . /etc/monok8s-s3-uploader.conf
-else
-    echo "Config file doesn't exists at /etc/monok8s-s3-uploader.conf"
-    exit 1
-fi
+# https://stackoverflow.com/questions/4774054/reliable-way-for-a-bash-script-to-get-the-full-path-to-itself
+SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 || exit ; pwd -P )"
+
+. "$SCRIPTPATH"/common.sh
+
+parse_config_monok8s_s3() {
+    CONFIG_PATH_MONOK8S="k8s.yml"
+    export REQUIRED=true
+
+    readarray -t K8S_LOG_LIST < <(yaml .k8s.log_list[] "$CONFIG_PATH_MONOK8S")
+
+    AWS_ACCESS_KEY_ID=$(yaml .aws.access_key_id $CONFIG_PATH_MONOK8S)
+    AWS_SECRET_ACCESS_KEY=$(yaml .aws.secret_access_key $CONFIG_PATH_MONOK8S)
+    S3_BUCKET=$(yaml .aws.bucket $CONFIG_PATH_MONOK8S)
+    AWS_ENDPOINT_URL=$(yaml .aws.endpoint_url $CONFIG_PATH_MONOK8S)
+    AWS_DEFAULT_REGION=$(yaml .aws.default_region $CONFIG_PATH_MONOK8S "us-east-1")
+
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONOK8S "$SEND_ALARM")
+}
+
+parse_config_monok8s_s3
 
 if [ -z "$ALARM_INTERVAL" ]; then
     ALARM_INTERVAL=3
