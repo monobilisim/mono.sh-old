@@ -21,7 +21,7 @@ parse_config_monofon() {
     TRUNK_CHECK_INTERVAL=$(yaml .trunk_check_interval $CONFIG_PATH_MONOFON)
     RESTART_ATTEMPT_INTERVAL=$(yaml .restart.attempt_interval $CONFIG_PATH_MONOFON)
     
-    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONOFON $SEND_ALARM)
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONOFON "$SEND_ALARM")
 }
 
 parse_config_monofon

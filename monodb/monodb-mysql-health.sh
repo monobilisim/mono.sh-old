@@ -22,7 +22,7 @@ parse_config_mysql() {
     CLUSTER_SIZE=$(yaml .cluster.size $CONFIG_PATH_MONODB)
     IS_CLUSTER=$(yaml .cluster.enabled $CONFIG_PATH_MONODB)
 
-    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONODB $SEND_ALARM)
+    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONODB "$SEND_ALARM")
 }
 
 parse_config_mysql

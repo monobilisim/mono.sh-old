@@ -38,16 +38,16 @@ parse_monocloud() {
 
     readarray -t FILESYSTEMS < <(yaml .filesystems[] "$CONFIG_PATH_MONOCLOUD")
     
-    SYSTEM_LOAD_AND_RAM=$(yaml .system_load_and_ram $CONFIG_PATH_MONOCLOUD 1)
+    SYSTEM_LOAD_AND_RAM=$(yaml .system_load_and_ram "$CONFIG_PATH_MONOCLOUD" 1)
     
-    DYNAMIC_LIMIT_INTERVAL=$(yaml .dynamic_limit_interval $CONFIG_PATH_MONOCLOUD 0)
-    LOAD_LIMIT_MULTIPLIER=$(yaml .load.limit_multiplier $CONFIG_PATH_MONOCLOUD 0.8)
+    DYNAMIC_LIMIT_INTERVAL=$(yaml .dynamic_limit_interval "$CONFIG_PATH_MONOCLOUD" 0)
+    LOAD_LIMIT_MULTIPLIER=$(yaml .load.limit_multiplier "$CONFIG_PATH_MONOCLOUD" 0.8)
     
-    PART_USE_LIMIT=$(yaml .part_use_limit $CONFIG_PATH_MONOCLOUD)
-    LOAD_LIMIT=$(yaml .load.limit $CONFIG_PATH_MONOCLOUD 20)
-    RAM_LIMIT=$(yaml .ram_limit $CONFIG_PATH_MONOCLOUD)
+    PART_USE_LIMIT=$(yaml .part_use_limit "$CONFIG_PATH_MONOCLOUD")
+    LOAD_LIMIT=$(yaml .load.limit "$CONFIG_PATH_MONOCLOUD" 20)
+    RAM_LIMIT=$(yaml .ram_limit "$CONFIG_PATH_MONOCLOUD")
 
-    SEND_ALARM=$(yaml .alarm.enabled $CONFIG_PATH_MONOCLOUD $SEND_ALARM)
+    SEND_ALARM=$(yaml .alarm.enabled "$CONFIG_PATH_MONOCLOUD" "$SEND_ALARM")
 }
 
 grep_custom() {
