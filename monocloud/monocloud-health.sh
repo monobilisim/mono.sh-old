@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ###~ description: This script is used to check the health of the server
 #~ variables
-script_version="v4.3.11"
+script_version="v4.3.12"
 
 if [[ "$CRON_MODE" == "1" ]]; then
     export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -32,6 +32,14 @@ grep_custom() {
         pcregrep $@
     else
         grep -P $@
+    fi
+}
+
+nproc_custom() {
+    if [[ "$(uname -s | tr '[:upper:]' '[:lower:]')" == "freebsd" ]]; then
+        sysctl -n hw.ncpu
+    else
+        nproc
     fi
 }
 
@@ -348,10 +356,10 @@ check_system_load_and_ram() {
     local json="{\"load\":\"$load\",\"ram\":\"$ram_usage\"}"
 
     if [[ $(echo "$load <= $LOAD_LIMIT_CPU" | bc -l) -eq 1 ]]; then
-        message="System load limit went below $LOAD_LIMIT_CPU (Current: $load, Multiplier: $LOAD_LIMIT_MULTIPLIER, CPU: $(nproc))"
+        message="System load limit went below $LOAD_LIMIT_CPU (Current: $load, Multiplier: $LOAD_LIMIT_MULTIPLIER, CPU: $(nproc_custom))"
         alarm_check_up "load" "$message" "system"
     else
-        message="The system load limit has exceeded $LOAD_LIMIT_CPU (Current: $load, Multiplier: $LOAD_LIMIT_MULTIPLIER, CPU: $(nproc))"
+        message="The system load limit has exceeded $LOAD_LIMIT_CPU (Current: $load, Multiplier: $LOAD_LIMIT_MULTIPLIER, CPU: $(nproc_custom))"
         alarm_check_down "load" "$message" "system"
     fi
 
@@ -603,7 +611,7 @@ main() {
 
     check_config_file "$CONFIG_PATH" && . "$CONFIG_PATH"
 
-    export LOAD_LIMIT_CPU="$(echo "$(nproc) * ${LOAD_LIMIT_MULTIPLIER:-1}" | bc) "
+    export LOAD_LIMIT_CPU="$(echo "$(nproc_custom) * ${LOAD_LIMIT_MULTIPLIER:-1}" | bc) "
 
     [[ -z "$ALARM_INTERVAL" ]] && ALARM_INTERVAL=3
     [[ -z "$DYNAMIC_LIMIT_INTERVAL" ]] && DYNAMIC_LIMIT_INTERVAL=100
