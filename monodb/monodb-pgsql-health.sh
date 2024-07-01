@@ -218,6 +218,17 @@ function pgsql_uptime() {
     fi
 }
 
+function write_active_connections() {
+    mkdir -p /var/log/monodb
+    if grep iasdb /etc/passwd &>/dev/null; then
+        su - iasdb -c "psql -c \"SELECT pid, now() - pg_stat_activity.query_start AS duration, query, state FROM pg_stat_activity  WHERE state='active' ORDER BY duration DESC;\"" >/var/log/monodb/pgsql-stat_activity-"$(date +"%a")".log
+    elif grep gitlab-psql /etc/passwd &>/dev/null; then
+        gitlab-psql -c "SELECT pid, now() - pg_stat_activity.query_start AS duration, query, state FROM pg_stat_activity  WHERE state='active' ORDER BY duration DESC;" >/var/log/monodb/pgsql-stat_activity-"$(date +"%a")".log
+    else
+        su - postgres -c "psql -c \"SELECT pid, now() - pg_stat_activity.query_start AS duration, query, state FROM pg_stat_activity  WHERE state='active' ORDER BY duration DESC;\"" >/var/log/monodb/pgsql-stat_activity-"$(date +"%a")".log
+    fi
+}
+
 function check_active_connections() {
     echo_status "Active Connections"
     if grep iasdb /etc/passwd &>/dev/null; then
@@ -240,10 +251,14 @@ function check_active_connections() {
     fi
 
     if eval "$(echo "$used_percentage $CONN_LIMIT_PERCENT" | awk '{if ($1 >= $2) print "true"; else print "false"}')"; then
+        if [ ! -f /tmp/monodb-pgsql-health/patroni_active_conn_status.txt ]; then
+            write_active_connections
+        fi
         alarm_check_down "active_conn" "Number of Active Connections is $used_conn ($used_percentage%) and Above $CONN_LIMIT_PERCENT%"
         print_colour "Number of Active Connections" "$used_conn ($used_percentage)% and Above $CONN_LIMIT_PERCENT%" "error"
         difference=$(((${used_percentage%.*} - ${CONN_LIMIT_PERCENT%.*}) / 10))
         if [[ $difference -ge $increase ]]; then
+            write_active_connections
             if [ -f "$file" ]; then
                 alarm "[PostgreSQL - $IDENTIFIER] [:red_circle:] Number of Active Connections has passed $((CONN_LIMIT_PERCENT + (increase * 10)))% - It is now $used_conn ($used_percentage%)"
             fi
