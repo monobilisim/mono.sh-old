@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 ###~ description: Checks the status of MySQL and MySQL cluster
-VERSION=v1.0.0
+VERSION=v1.1.0
 
 [[ "$1" == '-v' ]] || [[ "$1" == '--version' ]] && {
     echo "$VERSION"
